@@ -1,0 +1,54 @@
+add_expense:
+  name: Add expense
+  description: Create a new expense template.
+  fields:
+    name:
+      required: true
+      selector:
+        text:
+    category:
+      required: true
+      selector:
+        text:
+    recurrence:
+      required: true
+      selector:
+        select:
+          options:
+            - monthly
+            - one_time
+            - annual
+            - twice_yearly
+            - custom_months
+update_expense:
+  name: Update expense
+  description: Update an existing expense template.
+  fields:
+    template_id:
+      required: true
+      selector:
+        text:
+generate_year:
+  name: Generate year
+  description: Build a year plan from active templates.
+  fields:
+    year:
+      required: true
+      selector:
+        number:
+          min: 2000
+          max: 2100
+mark_paid:
+  name: Mark paid
+  description: Record a full payment against a month entry.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    amount:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box

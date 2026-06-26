@@ -1,0 +1,12 @@
+{
+  "domain": "finance_tracker",
+  "name": "Finance Tracker",
+  "version": "0.0.1",
+  "documentation": "https://github.com/REPLACE_ME/finance-tracker",
+  "issue_tracker": "https://github.com/REPLACE_ME/finance-tracker/issues",
+  "codeowners": [
+    "@REPLACE_ME"
+  ],
+  "requirements": [],
+  "iot_class": "local_polling"
+}
