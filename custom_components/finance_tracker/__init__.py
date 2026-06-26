@@ -5,14 +5,27 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, PLATFORMS
+from .const import DOMAIN, PLATFORMS, SERVICES_KEY, STORAGE_KEY
+from .services import FinanceTrackerServiceManager
+from .storage import FinanceTrackerStorage
 
 type FinanceTrackerConfigEntry = ConfigEntry
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the integration from YAML."""
-    hass.data.setdefault(DOMAIN, {})
+    domain_data = hass.data.setdefault(DOMAIN, {})
+
+    if STORAGE_KEY not in domain_data:
+        storage = FinanceTrackerStorage(hass)
+        await storage.async_initialize()
+        domain_data[STORAGE_KEY] = storage
+
+    if SERVICES_KEY not in domain_data:
+        services = FinanceTrackerServiceManager(hass, domain_data[STORAGE_KEY])
+        await services.async_setup()
+        domain_data[SERVICES_KEY] = services
+
     return True
 
 

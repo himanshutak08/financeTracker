@@ -20,6 +20,39 @@ add_expense:
             - annual
             - twice_yearly
             - custom_months
+    amount:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    due_day:
+      selector:
+        number:
+          min: 1
+          max: 31
+          mode: box
+    start_month:
+      selector:
+        text:
+    end_month:
+      selector:
+        text:
+    icon:
+      selector:
+        icon:
+    notes:
+      selector:
+        text:
+    reminder_days:
+      selector:
+        number:
+          min: 0
+          max: 60
+          mode: box
+    custom_months:
+      selector:
+        text:
 update_expense:
   name: Update expense
   description: Update an existing expense template.
@@ -28,6 +61,41 @@ update_expense:
       required: true
       selector:
         text:
+    name:
+      selector:
+        text:
+    category:
+      selector:
+        text:
+    recurrence:
+      selector:
+        select:
+          options:
+            - monthly
+            - one_time
+            - annual
+            - twice_yearly
+            - custom_months
+    amount:
+      selector:
+        number:
+          min: 0
+          mode: box
+    due_day:
+      selector:
+        number:
+          min: 1
+          max: 31
+          mode: box
+    icon:
+      selector:
+        icon:
+    notes:
+      selector:
+        text:
+    is_active:
+      selector:
+        boolean:
 generate_year:
   name: Generate year
   description: Build a year plan from active templates.
@@ -52,3 +120,9 @@ mark_paid:
         number:
           min: 0
           mode: box
+    paid_date:
+      selector:
+        text:
+    note:
+      selector:
+        text:
