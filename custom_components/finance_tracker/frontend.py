@@ -30,15 +30,17 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
     panel_dir = integration_dir / "panel"
     manifest = json.loads((integration_dir / "manifest.json").read_text(encoding="utf-8"))
     integration_version = manifest["version"]
+    static_url = f"{PANEL_STATIC_URL}_{integration_version.replace('.', '_')}"
     domain_data = hass.data.setdefault(DOMAIN, {})
-    if not domain_data.get(PANEL_STATIC_LOADED_KEY):
+    loaded_static_urls = domain_data.setdefault(PANEL_STATIC_LOADED_KEY, set())
+    if static_url not in loaded_static_urls:
         await async_register_static_path(
             hass,
-            PANEL_STATIC_URL,
+            static_url,
             str(panel_dir),
             cache_headers=False,
         )
-        domain_data[PANEL_STATIC_LOADED_KEY] = True
+        loaded_static_urls.add(static_url)
 
     async_remove_panel(hass, PANEL_FRONTEND_URL_PATH, warn_if_unknown=False)
 
@@ -53,7 +55,7 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
                 "name": PANEL_WEB_COMPONENT_NAME,
                 "embed_iframe": False,
                 "trust_external": False,
-                "js_url": f"{PANEL_STATIC_URL}/{PANEL_ENTRYPOINT}?v={integration_version}",
+                "js_url": f"{static_url}/{PANEL_ENTRYPOINT}?v={integration_version}",
             }
         },
         require_admin=True,
