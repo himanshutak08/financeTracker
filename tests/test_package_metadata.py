@@ -34,10 +34,10 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertTrue((brand / "icon.png").is_file())
         self.assertTrue((brand / "icon@2x.png").is_file())
 
-    def test_release_version_matches_ui_hotfix(self) -> None:
+    def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.2.1")
+        self.assertEqual(manifest["version"], "0.2.2")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -54,6 +54,8 @@ class PackageMetadataTests(unittest.TestCase):
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
 
         self.assertIn('"embed_iframe": False', frontend_source)
+        self.assertIn("async_remove_panel(hass, PANEL_FRONTEND_URL_PATH", frontend_source)
+        self.assertIn("?v={integration_version}", frontend_source)
         hass_setter = panel_source.split("set hass(hass)", 1)[1].split(
             "disconnectedCallback", 1
         )[0]
