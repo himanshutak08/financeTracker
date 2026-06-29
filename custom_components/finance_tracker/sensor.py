@@ -62,6 +62,7 @@ class FinanceTrackerDiagnosticSensor(SensorEntity):
             "db_path": diagnostics.get("db_path"),
             "db_exists": diagnostics.get("db_exists"),
             "last_error": diagnostics.get("last_error"),
+            "schema_version": diagnostics.get("schema_version"),
             "generated_at": diagnostics.get("generated_at"),
             "table_counts": diagnostics.get("table_counts", {}),
         }

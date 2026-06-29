@@ -16,14 +16,19 @@ from .const import (
     SERVICE_COPY_YEAR,
     SERVICE_GENERATE_YEAR,
     SERVICE_GET_CURRENT_MONTH,
+    SERVICE_GET_HISTORY,
+    SERVICE_GET_SETTINGS,
     SERVICE_GET_YEAR_PLAN,
     SERVICE_LIST_EXPENSES,
     SERVICE_MARK_PAID,
     SERVICE_MARK_PARTIAL,
     SERVICE_RUN_DIAGNOSTICS,
+    SERVICE_RUN_REMINDERS,
     SERVICE_UNDO_PAYMENT,
     SERVICE_UPDATE_EXPENSE,
     SERVICE_UPDATE_MONTH_ENTRY,
+    SERVICE_UPDATE_SETTINGS,
+    REMINDER_MANAGER_KEY,
 )
 from .storage import FinanceTrackerStorage
 
@@ -35,8 +40,8 @@ ADD_EXPENSE_SCHEMA = vol.Schema(
         vol.Required("amount"): vol.Coerce(float),
         vol.Optional("due_day"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=31))),
         vol.Optional("due_date"): str,
-        vol.Optional("start_month"): vol.Any(str, int),
-        vol.Optional("end_month"): vol.Any(str, int),
+        vol.Optional("start_month"): vol.Any(None, str, int),
+        vol.Optional("end_month"): vol.Any(None, str, int),
         vol.Optional("icon"): str,
         vol.Optional("notes"): str,
         vol.Optional("reminder_days", default=3): vol.All(vol.Coerce(int), vol.Range(min=0, max=60)),
@@ -66,8 +71,8 @@ UPDATE_EXPENSE_SCHEMA = vol.Schema(
         vol.Optional("amount"): vol.Coerce(float),
         vol.Optional("due_day"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=31))),
         vol.Optional("due_date"): str,
-        vol.Optional("start_month"): vol.Any(str, int),
-        vol.Optional("end_month"): vol.Any(str, int),
+        vol.Optional("start_month"): vol.Any(None, str, int),
+        vol.Optional("end_month"): vol.Any(None, str, int),
         vol.Optional("icon"): vol.Any(None, str),
         vol.Optional("notes"): vol.Any(None, str),
         vol.Optional("reminder_days"): vol.All(vol.Coerce(int), vol.Range(min=0, max=60)),
@@ -109,6 +114,23 @@ GET_YEAR_PLAN_SCHEMA = vol.Schema(
         vol.Optional("month"): vol.All(vol.Coerce(int), vol.Range(min=1, max=12)),
     }
 )
+
+GET_HISTORY_SCHEMA = vol.Schema(
+    {vol.Required("year"): vol.All(vol.Coerce(int), vol.Range(min=2000, max=2100))}
+)
+
+GET_SETTINGS_SCHEMA = vol.Schema({})
+UPDATE_SETTINGS_SCHEMA = vol.Schema(
+    {
+        vol.Optional("currency"): str,
+        vol.Optional("reminders_enabled"): bool,
+        vol.Optional("notification_service"): str,
+        vol.Optional("scan_interval_minutes"): vol.All(
+            vol.Coerce(int), vol.Range(min=5, max=1440)
+        ),
+    }
+)
+RUN_REMINDERS_SCHEMA = vol.Schema({})
 
 RUN_DIAGNOSTICS_SCHEMA = vol.Schema({})
 
@@ -212,6 +234,34 @@ class FinanceTrackerServiceManager:
         )
         self._hass.services.async_register(
             DOMAIN,
+            SERVICE_GET_HISTORY,
+            self._handle_get_history,
+            schema=GET_HISTORY_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+        self._hass.services.async_register(
+            DOMAIN,
+            SERVICE_GET_SETTINGS,
+            self._handle_get_settings,
+            schema=GET_SETTINGS_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+        self._hass.services.async_register(
+            DOMAIN,
+            SERVICE_UPDATE_SETTINGS,
+            self._handle_update_settings,
+            schema=UPDATE_SETTINGS_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+        self._hass.services.async_register(
+            DOMAIN,
+            SERVICE_RUN_REMINDERS,
+            self._handle_run_reminders,
+            schema=RUN_REMINDERS_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+        self._hass.services.async_register(
+            DOMAIN,
             SERVICE_RUN_DIAGNOSTICS,
             self._handle_run_diagnostics,
             schema=RUN_DIAGNOSTICS_SCHEMA,
@@ -258,6 +308,10 @@ class FinanceTrackerServiceManager:
             SERVICE_LIST_EXPENSES,
             SERVICE_GET_CURRENT_MONTH,
             SERVICE_GET_YEAR_PLAN,
+            SERVICE_GET_HISTORY,
+            SERVICE_GET_SETTINGS,
+            SERVICE_UPDATE_SETTINGS,
+            SERVICE_RUN_REMINDERS,
             SERVICE_RUN_DIAGNOSTICS,
             SERVICE_MARK_PAID,
             SERVICE_MARK_PARTIAL,
@@ -307,6 +361,25 @@ class FinanceTrackerServiceManager:
             plan_year=call.data["year"],
             month=call.data.get("month"),
         )
+
+    async def _handle_get_history(self, call: ServiceCall) -> dict[str, Any]:
+        return await self._storage.async_get_history(call.data["year"])
+
+    async def _handle_get_settings(self, call: ServiceCall) -> dict[str, Any]:
+        return await self._storage.async_get_settings()
+
+    async def _handle_update_settings(self, call: ServiceCall) -> dict[str, Any]:
+        result = await self._storage.async_update_settings(call.data)
+        manager = self._hass.data[DOMAIN].get(REMINDER_MANAGER_KEY)
+        if manager is not None:
+            await manager.async_reschedule()
+        return result
+
+    async def _handle_run_reminders(self, call: ServiceCall) -> dict[str, Any]:
+        manager = self._hass.data[DOMAIN].get(REMINDER_MANAGER_KEY)
+        if manager is None:
+            return {"enabled": False, "candidates": 0, "sent": 0, "failed": 0}
+        return await manager.async_run()
 
     async def _handle_run_diagnostics(self, call: ServiceCall) -> dict[str, Any]:
         return await self._storage.async_run_diagnostics()

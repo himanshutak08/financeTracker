@@ -19,6 +19,8 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_list_expenses)
     websocket_api.async_register_command(hass, ws_get_current_month)
     websocket_api.async_register_command(hass, ws_get_year_plan)
+    websocket_api.async_register_command(hass, ws_get_history)
+    websocket_api.async_register_command(hass, ws_get_settings)
 
 
 def _storage(hass: HomeAssistant) -> FinanceTrackerStorage:
@@ -101,6 +103,49 @@ async def ws_get_year_plan(
             plan_year=msg["year"],
             month=msg.get("month"),
         )
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "home_assistant_error", str(err))
+        return
+
+    connection.send_message(websocket_api.result_message(msg["id"], result))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "finance_tracker/get_history",
+        vol.Required("year"): vol.All(vol.Coerce(int), vol.Range(min=2000, max=2100)),
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_get_history(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Return yearly reporting data for the History panel."""
+    try:
+        result = await _storage(hass).async_get_history(msg["year"])
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "home_assistant_error", str(err))
+        return
+
+    connection.send_message(websocket_api.result_message(msg["id"], result))
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "finance_tracker/get_settings"}
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_get_settings(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Return application and reminder settings."""
+    try:
+        result = await _storage(hass).async_get_settings()
     except HomeAssistantError as err:
         connection.send_error(msg["id"], "home_assistant_error", str(err))
         return

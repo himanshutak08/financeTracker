@@ -63,6 +63,17 @@ Use HACS for:
 
 Do not use HACS as the normal day-to-day development loop.
 
+## Release Validation
+
+Before tagging a release:
+
+1. Run `python3 -m unittest discover -s tests -v`.
+2. Confirm the HACS and Hassfest GitHub checks pass.
+3. Install the repository as a HACS custom integration in a clean Home Assistant instance.
+4. Complete UI setup and confirm the Finance sidebar panel loads.
+5. Create sample data, upgrade from the previous release, and confirm the database schema version advances without data loss.
+6. Verify removal leaves `config/finance/tracker.db` intact.
+
 ## Commit Hygiene
 
 Safe to commit:

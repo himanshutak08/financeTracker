@@ -20,7 +20,7 @@ from .http_compat import async_register_static_path
 
 async def async_register_frontend(hass: HomeAssistant) -> None:
     """Register static panel assets and the Finance sidebar panel."""
-    panel_dir = Path(__file__).resolve().parents[2] / "panel"
+    panel_dir = Path(__file__).resolve().parent / "panel"
     await async_register_static_path(
         hass,
         PANEL_STATIC_URL,

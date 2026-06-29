@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from calendar import monthrange
 from collections.abc import Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 import json
 from pathlib import Path
 import sqlite3
-from typing import Any
+from typing import Any, Iterator
 from uuid import uuid4
 
 from homeassistant.core import HomeAssistant
@@ -123,6 +124,12 @@ CREATE TABLE IF NOT EXISTS audit_events (
     payload_json TEXT,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS app_settings (
+    setting_key TEXT PRIMARY KEY,
+    value_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 RECURRENCE_TYPES = {
@@ -132,6 +139,15 @@ RECURRENCE_TYPES = {
     "twice_yearly",
     "custom_months",
 }
+
+DEFAULT_SETTINGS = {
+    "currency": "INR",
+    "reminders_enabled": True,
+    "notification_service": "persistent_notification.create",
+    "scan_interval_minutes": 60,
+}
+
+SCHEMA_VERSION = 1
 
 
 @dataclass(slots=True)
@@ -215,6 +231,46 @@ class FinanceTrackerStorage:
             self._get_year_plan, plan_year, month
         )
 
+    async def async_get_history(self, plan_year: int) -> dict[str, Any]:
+        """Return yearly ledger reporting and payment history."""
+        return await self.hass.async_add_executor_job(self._get_history, plan_year)
+
+    async def async_get_settings(self) -> dict[str, Any]:
+        """Return application and reminder settings."""
+        return await self.hass.async_add_executor_job(self._get_settings)
+
+    async def async_update_settings(self, changes: Mapping[str, Any]) -> dict[str, Any]:
+        """Persist application and reminder settings."""
+        return await self.hass.async_add_executor_job(
+            self._update_settings, dict(changes)
+        )
+
+    async def async_get_reminder_candidates(
+        self, today: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Return due reminder candidates that have not been sent today."""
+        return await self.hass.async_add_executor_job(
+            self._get_reminder_candidates, today
+        )
+
+    async def async_log_notification(
+        self,
+        entry_id: str,
+        reminder_type: str,
+        dedupe_key: str,
+        channel: str,
+        payload: Mapping[str, Any],
+    ) -> None:
+        """Record a successfully delivered reminder."""
+        await self.hass.async_add_executor_job(
+            self._log_notification,
+            entry_id,
+            reminder_type,
+            dedupe_key,
+            channel,
+            dict(payload),
+        )
+
     async def async_mark_paid(
         self, entry_id: str, amount: float, paid_date: str | None, note: str | None
     ) -> dict[str, Any]:
@@ -260,6 +316,7 @@ class FinanceTrackerStorage:
             "setup_status": "unknown",
             "last_error": self._last_error,
             "table_counts": {},
+            "schema_version": None,
             "generated_at": None,
         }
 
@@ -267,13 +324,32 @@ class FinanceTrackerStorage:
         with self._connect() as conn:
             conn.execute("SELECT 1")
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(self._db_path)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.executescript(SCHEMA_SQL)
-        return conn
+        try:
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.executescript(SCHEMA_SQL)
+            self._apply_migrations(conn)
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
+    def _apply_migrations(self, conn: sqlite3.Connection) -> None:
+        """Upgrade the database schema without replacing user data."""
+        current_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if current_version > SCHEMA_VERSION:
+            raise HomeAssistantError(
+                f"Database schema {current_version} is newer than supported version {SCHEMA_VERSION}"
+            )
+
+        # Version 1 adopts the initial relational schema. SCHEMA_SQL uses
+        # idempotent CREATE statements, so pre-version databases keep all data.
+        if current_version < 1:
+            conn.execute("PRAGMA user_version = 1")
 
     def _collect_diagnostics(self) -> dict[str, Any]:
         diagnostics: dict[str, Any] = {
@@ -283,11 +359,15 @@ class FinanceTrackerStorage:
             "last_error": self._last_error,
             "table_counts": {},
             "generated_at": datetime.now(UTC).isoformat(),
+            "schema_version": None,
         }
 
         try:
             with self._connect() as conn:
                 table_counts = {}
+                diagnostics["schema_version"] = int(
+                    conn.execute("PRAGMA user_version").fetchone()[0]
+                )
                 for table in (
                     "expense_templates",
                     "year_plans",
@@ -1020,6 +1100,219 @@ class FinanceTrackerStorage:
             "monthly_rollups": monthly_rollups,
             "items": items,
         }
+
+    def _get_history(self, plan_year: int) -> dict[str, Any]:
+        if plan_year < 2000 or plan_year > 2100:
+            raise HomeAssistantError("year must be between 2000 and 2100")
+
+        today = date.today().isoformat()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    me.entry_id, me.plan_item_id, me.template_id, me.month_key,
+                    me.display_order, me.name, me.category, me.icon,
+                    me.scheduled_amount, me.actual_paid_amount, me.remaining_amount,
+                    me.due_date, me.status, me.notes, me.paid_date,
+                    yp.plan_year, yp.status AS plan_status
+                FROM month_entries me
+                JOIN year_plan_items ypi ON ypi.plan_item_id = me.plan_item_id
+                JOIN year_plans yp ON yp.year_plan_id = ypi.year_plan_id
+                WHERE yp.plan_year = ?
+                ORDER BY me.month_key, me.display_order, me.name
+                """,
+                (plan_year,),
+            ).fetchall()
+            payment_rows = conn.execute(
+                """
+                SELECT
+                    p.payment_id, p.entry_id, p.amount, p.paid_date, p.note,
+                    p.created_at, me.name, me.category, me.month_key
+                FROM payments p
+                JOIN month_entries me ON me.entry_id = p.entry_id
+                WHERE me.month_key LIKE ?
+                ORDER BY p.paid_date DESC, p.created_at DESC
+                """,
+                (f"{plan_year:04d}-%",),
+            ).fetchall()
+
+        entries = [self._serialize_month_entry(row, today) for row in rows]
+        monthly: list[dict[str, Any]] = []
+        for month_number in range(1, 13):
+            month_key = f"{plan_year:04d}-{month_number:02d}"
+            month_entries = [entry for entry in entries if entry["month_key"] == month_key]
+            monthly.append(
+                {
+                    "month": month_number,
+                    "month_key": month_key,
+                    "entry_count": len(month_entries),
+                    "summary": self._summarize_entries(month_entries),
+                    "entries": month_entries,
+                }
+            )
+
+        summary = self._summarize_entries(entries)
+        payments = [
+            {
+                "payment_id": row["payment_id"],
+                "entry_id": row["entry_id"],
+                "name": row["name"],
+                "category": row["category"],
+                "month_key": row["month_key"],
+                "amount": float(row["amount"]),
+                "paid_date": row["paid_date"],
+                "note": row["note"],
+                "created_at": row["created_at"],
+            }
+            for row in payment_rows
+        ]
+        return {
+            "year": plan_year,
+            "entry_count": len(entries),
+            "summary": summary,
+            "monthly": monthly,
+            "payments": payments,
+        }
+
+    def _get_settings(self) -> dict[str, Any]:
+        settings = dict(DEFAULT_SETTINGS)
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT setting_key, value_json FROM app_settings"
+            ).fetchall()
+        for row in rows:
+            if row["setting_key"] in settings:
+                settings[row["setting_key"]] = json.loads(row["value_json"])
+        return settings
+
+    def _update_settings(self, changes: dict[str, Any]) -> dict[str, Any]:
+        allowed = set(DEFAULT_SETTINGS)
+        unsupported = set(changes) - allowed
+        if unsupported:
+            raise HomeAssistantError(
+                f"Unsupported settings: {', '.join(sorted(unsupported))}"
+            )
+
+        normalized: dict[str, Any] = {}
+        if "currency" in changes:
+            currency = str(changes["currency"]).strip().upper()
+            if len(currency) != 3 or not currency.isalpha():
+                raise HomeAssistantError("currency must be a three-letter code")
+            normalized["currency"] = currency
+        if "reminders_enabled" in changes:
+            normalized["reminders_enabled"] = bool(changes["reminders_enabled"])
+        if "notification_service" in changes:
+            notification_service = str(changes["notification_service"]).strip()
+            parts = notification_service.split(".")
+            if len(parts) != 2 or not all(parts):
+                raise HomeAssistantError(
+                    "notification_service must use domain.service format"
+                )
+            normalized["notification_service"] = notification_service
+        if "scan_interval_minutes" in changes:
+            interval = int(changes["scan_interval_minutes"])
+            if interval < 5 or interval > 1440:
+                raise HomeAssistantError(
+                    "scan_interval_minutes must be between 5 and 1440"
+                )
+            normalized["scan_interval_minutes"] = interval
+
+        now = _utcnow()
+        with self._connect() as conn:
+            for key, value in normalized.items():
+                conn.execute(
+                    """
+                    INSERT INTO app_settings (setting_key, value_json, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(setting_key) DO UPDATE SET
+                        value_json = excluded.value_json,
+                        updated_at = excluded.updated_at
+                    """,
+                    (key, json.dumps(value), now),
+                )
+            self._insert_audit_event(
+                conn,
+                "settings",
+                "global",
+                "settings_updated",
+                normalized,
+            )
+        return self._get_settings()
+
+    def _get_reminder_candidates(self, today: str | None) -> list[dict[str, Any]]:
+        effective_today = date.fromisoformat(today) if today else date.today()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    me.entry_id, me.name, me.category, me.due_date,
+                    me.remaining_amount, me.scheduled_amount, et.reminder_days
+                FROM month_entries me
+                JOIN expense_templates et ON et.template_id = me.template_id
+                WHERE me.remaining_amount > 0 AND me.due_date IS NOT NULL
+                ORDER BY me.due_date, me.display_order, me.name
+                """
+            ).fetchall()
+            candidates = []
+            for row in rows:
+                due_date = date.fromisoformat(row["due_date"])
+                days_until_due = (due_date - effective_today).days
+                reminder_days = int(row["reminder_days"])
+                if days_until_due > reminder_days or days_until_due < -30:
+                    continue
+                reminder_type = (
+                    "overdue" if days_until_due < 0 else "due" if days_until_due == 0 else "upcoming"
+                )
+                dedupe_key = (
+                    f"{row['entry_id']}:{reminder_type}:{effective_today.isoformat()}"
+                )
+                already_sent = conn.execute(
+                    "SELECT 1 FROM notifications_log WHERE dedupe_key = ?",
+                    (dedupe_key,),
+                ).fetchone()
+                if already_sent:
+                    continue
+                candidates.append(
+                    {
+                        "entry_id": row["entry_id"],
+                        "name": row["name"],
+                        "category": row["category"],
+                        "due_date": row["due_date"],
+                        "remaining_amount": float(row["remaining_amount"]),
+                        "scheduled_amount": float(row["scheduled_amount"]),
+                        "days_until_due": days_until_due,
+                        "reminder_type": reminder_type,
+                        "dedupe_key": dedupe_key,
+                    }
+                )
+        return candidates
+
+    def _log_notification(
+        self,
+        entry_id: str,
+        reminder_type: str,
+        dedupe_key: str,
+        channel: str,
+        payload: dict[str, Any],
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO notifications_log (
+                    notification_id, entry_id, reminder_type, sent_at,
+                    dedupe_key, channel, payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    uuid4().hex,
+                    entry_id,
+                    reminder_type,
+                    _utcnow(),
+                    dedupe_key,
+                    channel,
+                    json.dumps(payload, sort_keys=True),
+                ),
+            )
 
     def _mark_paid(
         self, entry_id: str, amount: float, paid_date: str | None, note: str | None

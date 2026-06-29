@@ -183,6 +183,40 @@ get_year_plan:
         number:
           min: 1
           max: 12
+get_history:
+  name: Get history
+  description: Return yearly monthly totals, category breakdowns, entries, and payments.
+  fields:
+    year:
+      required: true
+      selector:
+        number:
+          min: 2000
+          max: 2100
+get_settings:
+  name: Get settings
+  description: Return Finance Tracker application and reminder settings.
+update_settings:
+  name: Update settings
+  description: Update currency and reminder delivery settings.
+  fields:
+    currency:
+      selector:
+        text:
+    reminders_enabled:
+      selector:
+        boolean:
+    notification_service:
+      selector:
+        text:
+    scan_interval_minutes:
+      selector:
+        number:
+          min: 5
+          max: 1440
+run_reminders:
+  name: Run reminders
+  description: Scan and deliver eligible reminders immediately.
 run_diagnostics:
   name: Run diagnostics
   description: Refresh temporary backend diagnostics without requiring a response payload.
