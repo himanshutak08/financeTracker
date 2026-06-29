@@ -8,12 +8,12 @@ from homeassistant.components.frontend import async_register_built_in_panel
 from homeassistant.core import HomeAssistant
 
 from .const import (
-    DOMAIN,
     PANEL_ENTRYPOINT,
     PANEL_FRONTEND_URL_PATH,
     PANEL_ICON,
     PANEL_STATIC_URL,
     PANEL_TITLE,
+    PANEL_WEB_COMPONENT_NAME,
 )
 from .http_compat import async_register_static_path
 
@@ -39,7 +39,7 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
         frontend_url_path=PANEL_FRONTEND_URL_PATH,
         config={
             "_panel_custom": {
-                "name": f"{DOMAIN}-panel",
+                "name": PANEL_WEB_COMPONENT_NAME,
                 "embed_iframe": True,
                 "trust_external": False,
                 "js_url": f"{PANEL_STATIC_URL}/{PANEL_ENTRYPOINT}",

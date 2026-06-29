@@ -34,10 +34,20 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertTrue((brand / "icon.png").is_file())
         self.assertTrue((brand / "icon@2x.png").is_file())
 
-    def test_release_version_matches_expected_first_hacs_release(self) -> None:
+    def test_release_version_matches_panel_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.1.0")
+        self.assertEqual(manifest["version"], "0.1.1")
+
+    def test_registered_panel_name_matches_custom_element(self) -> None:
+        constants = (INTEGRATION / "const.py").read_text()
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn('PANEL_WEB_COMPONENT_NAME = "finance-tracker-panel"', constants)
+        self.assertIn(
+            'customElements.define("finance-tracker-panel", FinanceTrackerPanel)',
+            panel_source,
+        )
 
 
 if __name__ == "__main__":
