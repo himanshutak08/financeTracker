@@ -26,7 +26,13 @@ class PackageMetadataTests(unittest.TestCase):
         hacs = json.loads((ROOT / "hacs.json").read_text())
 
         self.assertFalse(hacs["content_in_root"])
-        self.assertIn("finance_tracker", hacs["domains"])
+        self.assertNotIn("domains", hacs)
+
+    def test_hacs_brand_assets_are_packaged(self) -> None:
+        brand = INTEGRATION / "brand"
+
+        self.assertTrue((brand / "icon.png").is_file())
+        self.assertTrue((brand / "icon@2x.png").is_file())
 
     def test_release_version_matches_expected_first_hacs_release(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())

@@ -6,6 +6,7 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.discovery import async_load_platform
 
 from .const import (
@@ -27,6 +28,7 @@ from .websocket_api import async_register_websocket_commands
 type FinanceTrackerConfigEntry = ConfigEntry
 
 LOGGER = logging.getLogger(__name__)
+CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 
 async def _async_setup_runtime(hass: HomeAssistant) -> None:

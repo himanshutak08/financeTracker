@@ -2,8 +2,5 @@
   "name": "Finance Tracker",
   "render_readme": true,
   "content_in_root": false,
-  "domains": [
-    "finance_tracker"
-  ],
   "homeassistant": "2026.6.0"
 }
