@@ -1,16 +1,16 @@
 {
   "domain": "finance_tracker",
   "name": "Finance Tracker",
-  "version": "0.1.0",
-  "config_flow": true,
-  "documentation": "https://github.com/himanshutak08/financeTracker",
-  "issue_tracker": "https://github.com/himanshutak08/financeTracker/issues",
   "codeowners": [
     "@himanshutak08"
   ],
+  "config_flow": true,
   "dependencies": [
     "http"
   ],
+  "documentation": "https://github.com/himanshutak08/financeTracker",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/himanshutak08/financeTracker/issues",
   "requirements": [],
-  "iot_class": "local_polling"
+  "version": "0.1.0"
 }
