@@ -34,10 +34,10 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertTrue((brand / "icon.png").is_file())
         self.assertTrue((brand / "icon@2x.png").is_file())
 
-    def test_release_version_matches_cleanup_patch(self) -> None:
+    def test_release_version_matches_bulk_import_release(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.1.2")
+        self.assertEqual(manifest["version"], "0.2.0")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()

@@ -19,6 +19,7 @@ from .const import (
     SERVICE_GET_HISTORY,
     SERVICE_GET_SETTINGS,
     SERVICE_GET_YEAR_PLAN,
+    SERVICE_IMPORT_EXPENSES_FILE,
     SERVICE_LIST_EXPENSES,
     SERVICE_MARK_PAID,
     SERVICE_MARK_PARTIAL,
@@ -31,6 +32,7 @@ from .const import (
     REMINDER_MANAGER_KEY,
 )
 from .storage import FinanceTrackerStorage
+from .importer import parse_expense_file
 
 ADD_EXPENSE_SCHEMA = vol.Schema(
     {
@@ -50,6 +52,13 @@ ADD_EXPENSE_SCHEMA = vol.Schema(
         vol.Optional("month_day_overrides"): {
             str: vol.All(vol.Coerce(int), vol.Range(min=1, max=31))
         },
+    }
+)
+
+IMPORT_EXPENSES_FILE_SCHEMA = vol.Schema(
+    {
+        vol.Required("filename"): str,
+        vol.Required("content"): str,
     }
 )
 
@@ -178,6 +187,13 @@ class FinanceTrackerServiceManager:
         )
         self._hass.services.async_register(
             DOMAIN,
+            SERVICE_IMPORT_EXPENSES_FILE,
+            self._handle_import_expenses_file,
+            schema=IMPORT_EXPENSES_FILE_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+        self._hass.services.async_register(
+            DOMAIN,
             SERVICE_ARCHIVE_EXPENSE,
             self._handle_archive_expense,
             schema=ARCHIVE_EXPENSE_SCHEMA,
@@ -300,6 +316,7 @@ class FinanceTrackerServiceManager:
         """Remove registered services."""
         for service_name in (
             SERVICE_ADD_EXPENSE,
+            SERVICE_IMPORT_EXPENSES_FILE,
             SERVICE_ARCHIVE_EXPENSE,
             SERVICE_COPY_YEAR,
             SERVICE_UPDATE_EXPENSE,
@@ -322,6 +339,19 @@ class FinanceTrackerServiceManager:
 
     async def _handle_add_expense(self, call: ServiceCall) -> dict[str, Any]:
         return await self._storage.async_add_expense(call.data)
+
+    async def _handle_import_expenses_file(
+        self, call: ServiceCall
+    ) -> dict[str, Any]:
+        rows = parse_expense_file(call.data["filename"], call.data["content"])
+        imported = []
+        for row in rows:
+            imported.append(await self._storage.async_add_expense(row))
+        return {
+            "filename": call.data["filename"],
+            "imported_count": len(imported),
+            "expenses": imported,
+        }
 
     async def _handle_archive_expense(self, call: ServiceCall) -> dict[str, Any]:
         return await self._storage.async_archive_expense(call.data["template_id"])

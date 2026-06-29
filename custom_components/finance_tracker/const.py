@@ -18,6 +18,7 @@ PANEL_ENTRYPOINT = "entrypoint.js"
 PANEL_WEB_COMPONENT_NAME = "finance-tracker-panel"
 
 SERVICE_ADD_EXPENSE = "add_expense"
+SERVICE_IMPORT_EXPENSES_FILE = "import_expenses_file"
 SERVICE_ARCHIVE_EXPENSE = "archive_expense"
 SERVICE_COPY_YEAR = "copy_year"
 SERVICE_UPDATE_EXPENSE = "update_expense"

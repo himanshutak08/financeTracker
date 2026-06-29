@@ -53,6 +53,18 @@ add_expense:
     custom_months:
       selector:
         text:
+import_expenses_file:
+  name: Import expenses file
+  description: Import expense definitions from a UTF-8 CSV or Excel XLSX file.
+  fields:
+    filename:
+      required: true
+      selector:
+        text:
+    content:
+      required: true
+      selector:
+        text:
 archive_expense:
   name: Archive expense
   description: Deactivate an expense template so it no longer participates in new year plans.

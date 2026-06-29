@@ -30,6 +30,9 @@ class FinanceTrackerPanel extends HTMLElement {
     this._settingsError = "";
     this._settingsBusy = false;
     this._reminderRunResult = null;
+    this._importBusy = false;
+    this._importError = "";
+    this._importResult = null;
     this._boundPopstate = () => {
       this._route = this._routeFromLocation();
       this.render();
@@ -453,6 +456,64 @@ class FinanceTrackerPanel extends HTMLElement {
     }
   }
 
+  async importExpensesFile(form) {
+    if (!this._hass || this._importBusy) {
+      return;
+    }
+    const input = form.querySelector("input[type=file]");
+    const file = input?.files?.[0];
+    if (!file) {
+      this._importError = "Choose a CSV or XLSX file first.";
+      this.render();
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      this._importError = "Import files must be 5 MB or smaller.";
+      this.render();
+      return;
+    }
+
+    this._importBusy = true;
+    this._importError = "";
+    this._importResult = null;
+    this.render();
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+      }
+      this._importResult = await this._hass.callService(
+        "finance_tracker",
+        "import_expenses_file",
+        { filename: file.name, content: btoa(binary) },
+        {},
+        true
+      );
+    } catch (err) {
+      this._importError = err?.message || String(err);
+    } finally {
+      this._importBusy = false;
+      this.render();
+    }
+  }
+
+  downloadSampleCsv() {
+    const sample = [
+      "name,category,amount,recurrence,due_day,start_month,end_month,custom_months,icon,notes,reminder_days",
+      "Electricity,Utilities,2500,monthly,15,1,12,,mdi:lightning-bolt,Monthly power bill,3",
+      "Insurance,Insurance,12000,annual,10,4,4,,mdi:shield-home,Annual home insurance,7",
+      'Quarterly maintenance,Home,3000,custom_months,5,,,"1,4,7,10",mdi:tools,Quarterly maintenance,5',
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([sample], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "finance-tracker-expenses-sample.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   navigate(route) {
     if (route === this._route) {
       return;
@@ -479,6 +540,7 @@ class FinanceTrackerPanel extends HTMLElement {
     const tabs = [
       ["current", "Current Month"],
       ["add", "Add Expense"],
+      ["import", "Bulk Import"],
       ["year-setup", "Year Setup"],
       ["history", "History"],
       ["settings", "Settings"],
@@ -488,6 +550,8 @@ class FinanceTrackerPanel extends HTMLElement {
       ? this.renderCurrentMonth()
       : route === "add"
         ? this.renderExpenseManagement()
+        : route === "import"
+          ? this.renderBulkImport()
         : route === "year-setup"
           ? this.renderYearSetup()
           : route === "history"
@@ -963,6 +1027,27 @@ class FinanceTrackerPanel extends HTMLElement {
           padding-top: 8px;
         }
 
+        .import-zone {
+          background: rgba(255, 255, 255, 0.03);
+          border: 2px dashed rgba(148, 163, 184, 0.35);
+          border-radius: 20px;
+          display: grid;
+          gap: 16px;
+          padding: 24px;
+        }
+
+        .column-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .column-list code {
+          background: rgba(148, 163, 184, 0.14);
+          border-radius: 8px;
+          padding: 5px 8px;
+        }
+
         .error,
         .empty,
         .placeholder {
@@ -1129,6 +1214,15 @@ class FinanceTrackerPanel extends HTMLElement {
 
     this.shadowRoot.querySelector("[data-run-reminders]")?.addEventListener("click", () => {
       this.runRemindersNow();
+    });
+
+    this.shadowRoot.querySelector("[data-import-form]")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      this.importExpensesFile(event.currentTarget);
+    });
+
+    this.shadowRoot.querySelector("[data-download-sample]")?.addEventListener("click", () => {
+      this.downloadSampleCsv();
     });
   }
 
@@ -1411,6 +1505,58 @@ class FinanceTrackerPanel extends HTMLElement {
           <div class="eyebrow">Expense Catalog</div>
           <div class="section-title">Recurring definitions</div>
           ${listBody}
+        </section>
+      </div>
+    `;
+  }
+
+  renderBulkImport() {
+    const response = this._importResult?.response || this._importResult;
+    const imported = response?.expenses || [];
+    return `
+      <div class="toolbar">
+        <div>
+          <div class="eyebrow">Bulk Import</div>
+          <div class="section-title">Load expense definitions</div>
+          <div class="meta">Import up to 1,000 expenses from a UTF-8 CSV or Excel XLSX file.</div>
+        </div>
+        <button class="secondary-button" type="button" data-download-sample>Download sample CSV</button>
+      </div>
+      ${this._importError ? `<div class="error">${this._escape(this._importError)}</div><br>` : ""}
+      ${response ? `
+        <div class="empty">
+          <strong>${this._escape(response.imported_count || 0)} expenses imported from ${this._escape(response.filename || "file")}.</strong>
+          ${imported.length ? `<div class="meta">${imported.map((expense) => this._escape(expense.name)).join(" · ")}</div>` : ""}
+          <div class="form-actions" style="margin-top:12px">
+            <button class="primary-button" data-route="year-setup">Open Year Setup</button>
+            <button class="secondary-button" data-route="add">Review expenses</button>
+          </div>
+        </div><br>
+      ` : ""}
+      <div class="expense-layout">
+        <section>
+          <form class="import-zone" data-import-form>
+            <div>
+              <div class="eyebrow">Choose File</div>
+              <div class="section-title">CSV or Excel</div>
+            </div>
+            <input name="expense_file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+            <div class="meta">Maximum file size: 5 MB. The first worksheet is imported from Excel files.</div>
+            <button class="primary-button" type="submit" ${this._importBusy ? "disabled" : ""}>${this._importBusy ? "Importing..." : "Import expenses"}</button>
+          </form>
+        </section>
+        <section class="report-card">
+          <div class="eyebrow">File Format</div>
+          <div class="section-title">Expected columns</div>
+          <p class="meta">Required:</p>
+          <div class="column-list">
+            <code>name</code><code>category</code><code>amount</code><code>recurrence</code>
+          </div>
+          <p class="meta">Optional:</p>
+          <div class="column-list">
+            <code>due_day</code><code>start_month</code><code>end_month</code><code>custom_months</code><code>icon</code><code>notes</code><code>reminder_days</code>
+          </div>
+          <p class="meta">Recurrence values: monthly, one_time, annual, twice_yearly, or custom_months. Use comma-separated month numbers for custom_months.</p>
         </section>
       </div>
     `;
