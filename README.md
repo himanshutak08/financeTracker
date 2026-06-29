@@ -77,11 +77,12 @@ Database migrations run automatically during startup and preserve existing recor
 
 1. Remove Finance Tracker from **Settings → Devices & services**.
 2. Remove the integration through HACS and restart Home Assistant.
-3. The SQLite database is intentionally retained. Delete `config/finance/tracker.db` manually only if all finance history should be permanently removed.
+3. Removing the integration stops reminder scheduling, unregisters services, unloads entities, and removes the Finance sidebar panel.
+4. The SQLite database is intentionally retained. Delete `config/finance/tracker.db` manually only if all finance history should be permanently removed.
 
 ## Releases
 
-HACS releases should use semantic version tags such as `v0.1.1`. The tag version must match `custom_components/finance_tracker/manifest.json`, and each GitHub release should summarize migrations and user-visible changes.
+HACS releases should use semantic version tags such as `v0.1.2`. The tag version must match `custom_components/finance_tracker/manifest.json`, and each GitHub release should summarize migrations and user-visible changes.
 
 ## Planned repository structure
 

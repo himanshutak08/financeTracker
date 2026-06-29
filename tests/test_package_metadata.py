@@ -34,10 +34,10 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertTrue((brand / "icon.png").is_file())
         self.assertTrue((brand / "icon@2x.png").is_file())
 
-    def test_release_version_matches_panel_hotfix(self) -> None:
+    def test_release_version_matches_cleanup_patch(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.1.1")
+        self.assertEqual(manifest["version"], "0.1.2")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -48,6 +48,13 @@ class PackageMetadataTests(unittest.TestCase):
             'customElements.define("finance-tracker-panel", FinanceTrackerPanel)',
             panel_source,
         )
+
+    def test_config_entry_removal_preserves_database(self) -> None:
+        integration_source = (INTEGRATION / "__init__.py").read_text()
+
+        self.assertIn("async def async_remove_entry", integration_source)
+        self.assertIn("async_unregister_frontend(hass)", integration_source)
+        self.assertNotIn("unlink(", integration_source)
 
 
 if __name__ == "__main__":

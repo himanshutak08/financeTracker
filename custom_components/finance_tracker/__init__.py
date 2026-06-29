@@ -19,7 +19,7 @@ from .const import (
     WEBSOCKET_API_LOADED_KEY,
     YAML_SENSOR_LOADED_KEY,
 )
-from .frontend import async_register_frontend
+from .frontend import async_register_frontend, async_unregister_frontend
 from .reminders import FinanceTrackerReminderManager
 from .services import FinanceTrackerServiceManager
 from .storage import FinanceTrackerStorage
@@ -95,3 +95,25 @@ async def async_unload_entry(
 ) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_entry(
+    hass: HomeAssistant, entry: FinanceTrackerConfigEntry
+) -> None:
+    """Clean up runtime resources while deliberately preserving finance data."""
+    domain_data = hass.data.get(DOMAIN, {})
+
+    # A legacy YAML setup may still own the shared runtime.
+    if domain_data.get(YAML_SENSOR_LOADED_KEY):
+        return
+
+    reminder_manager = domain_data.pop(REMINDER_MANAGER_KEY, None)
+    if reminder_manager is not None:
+        reminder_manager.async_unload()
+
+    services = domain_data.pop(SERVICES_KEY, None)
+    if services is not None:
+        services.async_on_unload()
+
+    async_unregister_frontend(hass)
+    domain_data.pop(FRONTEND_LOADED_KEY, None)
