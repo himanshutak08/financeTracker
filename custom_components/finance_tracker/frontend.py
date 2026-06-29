@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from homeassistant.components.frontend import (
-    async_panel_exists,
     async_register_built_in_panel,
     async_remove_panel,
 )
@@ -26,7 +26,10 @@ from .http_compat import async_register_static_path
 
 async def async_register_frontend(hass: HomeAssistant) -> None:
     """Register static panel assets and the Finance sidebar panel."""
-    panel_dir = Path(__file__).resolve().parent / "panel"
+    integration_dir = Path(__file__).resolve().parent
+    panel_dir = integration_dir / "panel"
+    manifest = json.loads((integration_dir / "manifest.json").read_text(encoding="utf-8"))
+    integration_version = manifest["version"]
     domain_data = hass.data.setdefault(DOMAIN, {})
     if not domain_data.get(PANEL_STATIC_LOADED_KEY):
         await async_register_static_path(
@@ -37,8 +40,7 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
         )
         domain_data[PANEL_STATIC_LOADED_KEY] = True
 
-    if async_panel_exists(hass, PANEL_FRONTEND_URL_PATH):
-        return
+    async_remove_panel(hass, PANEL_FRONTEND_URL_PATH, warn_if_unknown=False)
 
     async_register_built_in_panel(
         hass,
@@ -51,7 +53,7 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
                 "name": PANEL_WEB_COMPONENT_NAME,
                 "embed_iframe": False,
                 "trust_external": False,
-                "js_url": f"{PANEL_STATIC_URL}/{PANEL_ENTRYPOINT}",
+                "js_url": f"{PANEL_STATIC_URL}/{PANEL_ENTRYPOINT}?v={integration_version}",
             }
         },
         require_admin=True,
