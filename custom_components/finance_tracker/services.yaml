@@ -53,6 +53,30 @@ add_expense:
     custom_months:
       selector:
         text:
+archive_expense:
+  name: Archive expense
+  description: Deactivate an expense template so it no longer participates in new year plans.
+  fields:
+    template_id:
+      required: true
+      selector:
+        text:
+copy_year:
+  name: Copy year
+  description: Copy an existing year plan into a draft target year for review.
+  fields:
+    source_year:
+      required: true
+      selector:
+        number:
+          min: 2000
+          max: 2100
+    target_year:
+      required: true
+      selector:
+        number:
+          min: 2000
+          max: 2100
 update_expense:
   name: Update expense
   description: Update an existing expense template.
@@ -106,9 +130,65 @@ generate_year:
         number:
           min: 2000
           max: 2100
+activate_year:
+  name: Activate year
+  description: Mark a reviewed year plan as the active plan.
+  fields:
+    year:
+      required: true
+      selector:
+        number:
+          min: 2000
+          max: 2100
+list_expenses:
+  name: List expenses
+  description: Return expense master rows for the panel and admin views.
+  fields:
+    active_only:
+      selector:
+        boolean:
+    category:
+      selector:
+        text:
+get_current_month:
+  name: Get current month
+  description: Return the month ledger with summary totals and optional filters.
+  fields:
+    month_key:
+      selector:
+        text:
+    status:
+      selector:
+        select:
+          options:
+            - pending
+            - partial
+            - paid
+            - overdue
+    category:
+      selector:
+        text:
+get_year_plan:
+  name: Get year plan
+  description: Return the selected year plan with monthly rollups and plan items.
+  fields:
+    year:
+      required: true
+      selector:
+        number:
+          min: 2000
+          max: 2100
+    month:
+      selector:
+        number:
+          min: 1
+          max: 12
+run_diagnostics:
+  name: Run diagnostics
+  description: Refresh temporary backend diagnostics without requiring a response payload.
 mark_paid:
   name: Mark paid
-  description: Record a full payment against a month entry.
+  description: Record a payment against a month entry.
   fields:
     entry_id:
       required: true
@@ -124,5 +204,61 @@ mark_paid:
       selector:
         text:
     note:
+      selector:
+        text:
+mark_partial:
+  name: Mark partial
+  description: Record a partial payment against a month entry.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    amount:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    paid_date:
+      selector:
+        text:
+    note:
+      selector:
+        text:
+update_month_entry:
+  name: Update month entry
+  description: Override a generated month entry for the current year's working ledger.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    name:
+      selector:
+        text:
+    category:
+      selector:
+        text:
+    icon:
+      selector:
+        icon:
+    notes:
+      selector:
+        text:
+    due_date:
+      selector:
+        text:
+    scheduled_amount:
+      selector:
+        number:
+          min: 0
+          mode: box
+undo_payment:
+  name: Undo payment
+  description: Delete a recorded payment and recalculate the month entry balances.
+  fields:
+    payment_id:
+      required: true
       selector:
         text:
