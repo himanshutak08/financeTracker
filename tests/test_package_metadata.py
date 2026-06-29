@@ -34,10 +34,10 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertTrue((brand / "icon.png").is_file())
         self.assertTrue((brand / "icon@2x.png").is_file())
 
-    def test_release_version_matches_bulk_import_release(self) -> None:
+    def test_release_version_matches_ui_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.2.0")
+        self.assertEqual(manifest["version"], "0.2.1")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -48,6 +48,16 @@ class PackageMetadataTests(unittest.TestCase):
             'customElements.define("finance-tracker-panel", FinanceTrackerPanel)',
             panel_source,
         )
+
+    def test_panel_uses_host_theme_and_preserves_form_state(self) -> None:
+        frontend_source = (INTEGRATION / "frontend.py").read_text()
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn('"embed_iframe": False', frontend_source)
+        hass_setter = panel_source.split("set hass(hass)", 1)[1].split(
+            "disconnectedCallback", 1
+        )[0]
+        self.assertNotIn("this.render();\n  }", hass_setter)
 
     def test_config_entry_removal_preserves_database(self) -> None:
         integration_source = (INTEGRATION / "__init__.py").read_text()
