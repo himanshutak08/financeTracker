@@ -11,7 +11,6 @@ from homeassistant.helpers.discovery import async_load_platform
 
 from .const import (
     DOMAIN,
-    FRONTEND_LOADED_KEY,
     PLATFORMS,
     REMINDER_MANAGER_KEY,
     SERVICES_KEY,
@@ -60,13 +59,10 @@ async def _async_setup_runtime(hass: HomeAssistant) -> None:
         else:
             domain_data[WEBSOCKET_API_LOADED_KEY] = True
 
-    if not domain_data.get(FRONTEND_LOADED_KEY):
-        try:
-            await async_register_frontend(hass)
-        except Exception:
-            LOGGER.exception("Failed to register Finance Tracker frontend")
-        else:
-            domain_data[FRONTEND_LOADED_KEY] = True
+    try:
+        await async_register_frontend(hass)
+    except Exception:
+        LOGGER.exception("Failed to register Finance Tracker frontend")
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -116,4 +112,3 @@ async def async_remove_entry(
         services.async_on_unload()
 
     async_unregister_frontend(hass)
-    domain_data.pop(FRONTEND_LOADED_KEY, None)
