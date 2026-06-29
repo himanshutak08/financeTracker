@@ -2,6 +2,10 @@
 
 This directory contains the dedicated Finance Tracker panel frontend.
 
+The distributable source now lives at
+`custom_components/finance_tracker/panel/entrypoint.js` so HACS installs the
+frontend with the integration backend. This directory only documents the panel.
+
 ## Routes
 
 - `/finance/current`
@@ -10,11 +14,10 @@ This directory contains the dedicated Finance Tracker panel frontend.
 - `/finance/history`
 - `/finance/settings`
 
-## Current milestone
+## Implemented routes
 
-The first panel milestone is now in place:
-
-- `entrypoint.js` registers the panel custom element.
-- The Current Month route loads ledger data through websocket commands.
-- The Current Month route can trigger the backend `mark_paid` service for quick-pay flows.
-- The remaining routes are scaffold placeholders for the next implementation slices.
+- Current Month ledger, filters, payments, and entry editing
+- Expense management
+- Year Setup
+- History reporting
+- Reminder and application settings

@@ -117,7 +117,27 @@ Core tables:
 - Write services cover expense management, year generation, payment recording, partial payments, month-entry updates, and payment undo.
 - Read models exist for expense listing, current month ledger, and year plan retrieval.
 - A websocket API exposes those read models to the panel frontend.
-- A first panel shell exists with routes for Current Month, Add Expense, Year Setup, History, and Settings.
+- The panel implements Current Month, expense management, Year Setup, History, and Settings workflows.
+- A scheduled reminder engine delivers deduplicated upcoming, due, and overdue notifications through Home Assistant services.
+
+## Recommended Implementation Path
+
+1. Add backend tests for storage, recurrence generation, payments, payment undo, and year copying.
+2. Fix integration metadata and complete the Home Assistant config-entry lifecycle.
+3. Build expense management in the panel: list, add, edit, and archive.
+4. Build year setup: generate or copy, review, adjust, and activate a plan.
+5. Complete Current Month with filters, partial payments, entry editing, and notes.
+6. Add history APIs and UI for monthly and category reporting.
+7. Implement reminder scheduling, notification delivery, deduplication, and settings.
+8. Make the repository ready for HACS import and distribution:
+   - replace placeholder manifest URLs and code owners
+   - validate `hacs.json` and the custom integration repository structure
+   - add installation, configuration, upgrade, and removal instructions
+   - add release tags and GitHub release notes
+   - test a clean HACS custom-repository install in Home Assistant
+   - test upgrades while preserving the SQLite database and applying schema migrations
+
+HACS is the intended distribution and update mechanism. Home Assistant remains the runtime, and direct local installation remains the development workflow.
 
 ## Development Rules
 
