@@ -34,7 +34,8 @@ The first implementation phases are:
 - Read models exist for expense listing, current month ledger, and year plan retrieval.
 - A websocket API now exposes those read models to the panel.
 - Home Assistant UI setup is supported through a single-instance config flow.
-- The sidebar panel provides Current Month, expense management, and a Year Setup workflow for generating, copying, reviewing, adjusting, and activating plans; History and Settings remain scaffolded.
+- The sidebar panel provides Current Month, expense management, bulk import, Year Setup, History, and Settings workflows.
+- Bulk Import accepts UTF-8 CSV and Excel XLSX files with up to 1,000 expense definitions and provides a downloadable sample CSV.
 - Current Month supports month, status, and category filters; full or partial payments; and month-specific amount, due-date, category, and note editing.
 - History provides annual totals, monthly paid-vs-planned drill-downs, category breakdowns, and recorded payment transactions.
 - The reminder engine periodically delivers deduplicated upcoming, due, and overdue notifications through a configurable Home Assistant notification service.
@@ -82,7 +83,7 @@ Database migrations run automatically during startup and preserve existing recor
 
 ## Releases
 
-HACS releases should use semantic version tags such as `v0.1.2`. The tag version must match `custom_components/finance_tracker/manifest.json`, and each GitHub release should summarize migrations and user-visible changes.
+HACS releases should use semantic version tags such as `v0.2.0`. The tag version must match `custom_components/finance_tracker/manifest.json`, and each GitHub release should summarize migrations and user-visible changes.
 
 ## Planned repository structure
 
