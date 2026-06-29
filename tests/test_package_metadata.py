@@ -37,7 +37,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.2.5")
+        self.assertEqual(manifest["version"], "0.2.6")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -72,6 +72,15 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn("await async_register_frontend(hass)", integration_source)
         self.assertNotIn("if not domain_data.get(FRONTEND_LOADED_KEY)", integration_source)
         self.assertNotIn("unlink(", integration_source)
+
+    def test_import_service_call_requests_response_payload(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        import_call = panel_source.split('"import_expenses_file"', 1)[1].split(
+            ");", 1
+        )[0]
+        self.assertIn("{ filename: file.name, content: btoa(binary) }", import_call)
+        self.assertIn("{},\n        true,\n        true", import_call)
 
 
 if __name__ == "__main__":

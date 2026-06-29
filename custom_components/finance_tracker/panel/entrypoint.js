@@ -491,6 +491,7 @@ class FinanceTrackerPanel extends HTMLElement {
         "import_expenses_file",
         { filename: file.name, content: btoa(binary) },
         {},
+        true,
         true
       );
     } catch (err) {
