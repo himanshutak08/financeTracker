@@ -486,14 +486,11 @@ class FinanceTrackerPanel extends HTMLElement {
       for (let offset = 0; offset < bytes.length; offset += chunkSize) {
         binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
       }
-      this._importResult = await this._hass.callService(
-        "finance_tracker",
-        "import_expenses_file",
-        { filename: file.name, content: btoa(binary) },
-        {},
-        true,
-        true
-      );
+      this._importResult = await this._hass.connection.sendMessagePromise({
+        type: "finance_tracker/import_expenses_file",
+        filename: file.name,
+        content: btoa(binary),
+      });
     } catch (err) {
       this._importError = err?.message || String(err);
     } finally {

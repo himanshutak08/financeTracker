@@ -10,6 +10,7 @@ from homeassistant.exceptions import HomeAssistantError
 import voluptuous as vol
 
 from .const import DOMAIN, STORAGE_KEY
+from .importer import parse_expense_file
 from .storage import FinanceTrackerStorage
 
 
@@ -21,6 +22,7 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_get_year_plan)
     websocket_api.async_register_command(hass, ws_get_history)
     websocket_api.async_register_command(hass, ws_get_settings)
+    websocket_api.async_register_command(hass, ws_import_expenses_file)
 
 
 def _storage(hass: HomeAssistant) -> FinanceTrackerStorage:
@@ -151,3 +153,40 @@ async def ws_get_settings(
         return
 
     connection.send_message(websocket_api.result_message(msg["id"], result))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "finance_tracker/import_expenses_file",
+        vol.Required("filename"): str,
+        vol.Required("content"): str,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_import_expenses_file(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Import expense definitions from an uploaded file."""
+    try:
+        rows = parse_expense_file(msg["filename"], msg["content"])
+        imported = []
+        storage = _storage(hass)
+        for row in rows:
+            imported.append(await storage.async_add_expense(row))
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "home_assistant_error", str(err))
+        return
+
+    connection.send_message(
+        websocket_api.result_message(
+            msg["id"],
+            {
+                "filename": msg["filename"],
+                "imported_count": len(imported),
+                "expenses": imported,
+            },
+        )
+    )

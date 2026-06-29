@@ -37,7 +37,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.2.6")
+        self.assertEqual(manifest["version"], "0.2.7")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -73,14 +73,14 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertNotIn("if not domain_data.get(FRONTEND_LOADED_KEY)", integration_source)
         self.assertNotIn("unlink(", integration_source)
 
-    def test_import_service_call_requests_response_payload(self) -> None:
+    def test_import_uses_panel_websocket_command(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+        websocket_source = (INTEGRATION / "websocket_api.py").read_text()
 
-        import_call = panel_source.split('"import_expenses_file"', 1)[1].split(
-            ");", 1
-        )[0]
-        self.assertIn("{ filename: file.name, content: btoa(binary) }", import_call)
-        self.assertIn("{},\n        true,\n        true", import_call)
+        self.assertIn('type: "finance_tracker/import_expenses_file"', panel_source)
+        self.assertNotIn('"import_expenses_file",\n        { filename', panel_source)
+        self.assertIn('"finance_tracker/import_expenses_file"', websocket_source)
+        self.assertIn("parse_expense_file", websocket_source)
 
 
 if __name__ == "__main__":
