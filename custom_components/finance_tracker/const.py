@@ -14,6 +14,7 @@ PANEL_TITLE = "Finance"
 PANEL_ICON = "mdi:cash-multiple"
 PANEL_STATIC_URL = "/finance_tracker_panel"
 PANEL_ENTRYPOINT = "entrypoint.js"
+PANEL_WEB_COMPONENT_NAME = "finance-tracker-panel"
 
 SERVICE_ADD_EXPENSE = "add_expense"
 SERVICE_ARCHIVE_EXPENSE = "archive_expense"
