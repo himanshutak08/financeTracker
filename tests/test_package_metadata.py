@@ -37,7 +37,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.2.3")
+        self.assertEqual(manifest["version"], "0.2.4")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -67,6 +67,8 @@ class PackageMetadataTests(unittest.TestCase):
 
         self.assertIn("async def async_remove_entry", integration_source)
         self.assertIn("async_unregister_frontend(hass)", integration_source)
+        self.assertIn("await async_register_frontend(hass)", integration_source)
+        self.assertNotIn("if not domain_data.get(FRONTEND_LOADED_KEY)", integration_source)
         self.assertNotIn("unlink(", integration_source)
 
 

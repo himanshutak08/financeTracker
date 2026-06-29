@@ -33,6 +33,9 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
     static_url = f"{PANEL_STATIC_URL}_{integration_version.replace('.', '_')}"
     domain_data = hass.data.setdefault(DOMAIN, {})
     loaded_static_urls = domain_data.setdefault(PANEL_STATIC_LOADED_KEY, set())
+    if not isinstance(loaded_static_urls, set):
+        loaded_static_urls = set()
+        domain_data[PANEL_STATIC_LOADED_KEY] = loaded_static_urls
     if static_url not in loaded_static_urls:
         await async_register_static_path(
             hass,
