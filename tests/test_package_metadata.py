@@ -37,7 +37,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.2.2")
+        self.assertEqual(manifest["version"], "0.2.3")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -56,6 +56,7 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn('"embed_iframe": False', frontend_source)
         self.assertIn("async_remove_panel(hass, PANEL_FRONTEND_URL_PATH", frontend_source)
         self.assertIn("?v={integration_version}", frontend_source)
+        self.assertIn("static_url = f\"{PANEL_STATIC_URL}_{integration_version.replace('.', '_')}\"", frontend_source)
         hass_setter = panel_source.split("set hass(hass)", 1)[1].split(
             "disconnectedCallback", 1
         )[0]
