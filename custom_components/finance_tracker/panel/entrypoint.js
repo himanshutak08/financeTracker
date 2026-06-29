@@ -16,6 +16,7 @@ class FinanceTrackerPanel extends HTMLElement {
     this._expenseError = "";
     this._expenseBusy = false;
     this._editingExpenseId = null;
+    this._expenseDraft = null;
     this._planYear = new Date().getFullYear();
     this._yearPlan = null;
     this._yearLoading = false;
@@ -70,8 +71,6 @@ class FinanceTrackerPanel extends HTMLElement {
       }
       return;
     }
-
-    this.render();
   }
 
   disconnectedCallback() {
@@ -141,6 +140,7 @@ class FinanceTrackerPanel extends HTMLElement {
       return;
     }
     const formData = new FormData(form);
+    this._expenseDraft = Object.fromEntries(formData.entries());
     const entryId = String(formData.get("entry_id"));
     const amount = Number(formData.get("amount"));
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -271,6 +271,7 @@ class FinanceTrackerPanel extends HTMLElement {
         await this._hass.callService("finance_tracker", "add_expense", payload);
       }
       this._editingExpenseId = null;
+      this._expenseDraft = null;
       await this.loadExpenses();
     } catch (err) {
       this._expenseError = err?.message || String(err);
@@ -298,6 +299,7 @@ class FinanceTrackerPanel extends HTMLElement {
       });
       if (this._editingExpenseId === templateId) {
         this._editingExpenseId = null;
+        this._expenseDraft = null;
       }
       await this.loadExpenses();
     } catch (err) {
@@ -565,15 +567,13 @@ class FinanceTrackerPanel extends HTMLElement {
         :host {
           color: var(--primary-text-color);
           display: block;
-          font-family: "Avenir Next", "Segoe UI", sans-serif;
+          font-family: Roboto, "Segoe UI", sans-serif;
         }
 
         .app {
           min-height: 100vh;
-          background:
-            radial-gradient(circle at top left, rgba(28, 126, 214, 0.18), transparent 24rem),
-            linear-gradient(180deg, var(--primary-background-color), var(--secondary-background-color));
-          padding: 24px;
+          background: var(--primary-background-color, #f4f6f8);
+          padding: clamp(16px, 3vw, 36px);
           box-sizing: border-box;
         }
 
@@ -584,8 +584,8 @@ class FinanceTrackerPanel extends HTMLElement {
 
         .hero {
           display: grid;
-          gap: 12px;
-          margin-bottom: 20px;
+          gap: 10px;
+          margin-bottom: 16px;
         }
 
         .eyebrow {
@@ -598,46 +598,47 @@ class FinanceTrackerPanel extends HTMLElement {
 
         h1 {
           margin: 0;
-          font-size: clamp(32px, 4vw, 48px);
-          line-height: 1;
+          font-size: clamp(28px, 4vw, 44px);
+          letter-spacing: -0.025em;
+          line-height: 1.08;
         }
 
         .subtitle {
           color: var(--secondary-text-color);
-          font-size: 15px;
-          max-width: 60ch;
+          font-size: 16px;
+          line-height: 1.5;
+          max-width: 68ch;
         }
 
         .tabs {
           display: flex;
           flex-wrap: wrap;
-          gap: 10px;
-          margin: 20px 0 28px;
+          gap: 8px;
+          margin: 16px 0 20px;
         }
 
         .tab {
           border: 1px solid var(--divider-color);
-          background: rgba(255, 255, 255, 0.04);
-          border-radius: 999px;
+          background: var(--card-background-color, #fff);
+          border-radius: 10px;
           color: inherit;
           cursor: pointer;
           font: inherit;
-          padding: 10px 16px;
+          padding: 9px 14px;
         }
 
         .tab.active {
-          background: var(--primary-color);
-          border-color: var(--primary-color);
-          color: var(--text-primary-color, #fff);
+          background: var(--primary-color, #03a9f4);
+          border-color: var(--primary-color, #03a9f4);
+          color: #fff;
         }
 
         .panel {
-          background: rgba(18, 24, 35, 0.48);
-          border: 1px solid rgba(148, 163, 184, 0.2);
-          border-radius: 24px;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
-          padding: 20px;
-          backdrop-filter: blur(14px);
+          background: var(--card-background-color, #fff);
+          border: 1px solid var(--divider-color, #e1e4e8);
+          border-radius: 16px;
+          box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+          padding: clamp(16px, 2.5vw, 28px);
         }
 
         .summary {
@@ -648,7 +649,7 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .metric {
-          background: rgba(255, 255, 255, 0.04);
+          background: var(--secondary-background-color, #f6f7f8);
           border-radius: 18px;
           padding: 16px;
         }
@@ -697,8 +698,8 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .entry {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(148, 163, 184, 0.16);
+          background: var(--secondary-background-color, #f6f7f8);
+          border: 1px solid var(--divider-color, #e1e4e8);
           border-radius: 18px;
           display: grid;
           gap: 12px;
@@ -736,7 +737,7 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .detail-form {
-          background: rgba(0, 0, 0, 0.12);
+          background: var(--primary-background-color, #f4f6f8);
           border-radius: 14px;
           margin-top: 10px;
           padding: 12px;
@@ -822,7 +823,7 @@ class FinanceTrackerPanel extends HTMLElement {
         input,
         select,
         textarea {
-          background: var(--card-background-color, rgba(255, 255, 255, 0.06));
+          background: var(--card-background-color, #fff);
           border: 1px solid var(--divider-color);
           border-radius: 12px;
           box-sizing: border-box;
@@ -860,7 +861,7 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .secondary-button {
-          background: rgba(148, 163, 184, 0.16);
+          background: var(--secondary-background-color, #eef1f4);
           color: inherit;
         }
 
@@ -880,8 +881,8 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .expense-card {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(148, 163, 184, 0.16);
+          background: var(--secondary-background-color, #f6f7f8);
+          border: 1px solid var(--divider-color, #e1e4e8);
           border-radius: 16px;
           display: grid;
           gap: 10px;
@@ -914,8 +915,8 @@ class FinanceTrackerPanel extends HTMLElement {
 
         .control-card,
         .month-group {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(148, 163, 184, 0.16);
+          background: var(--secondary-background-color, #f6f7f8);
+          border: 1px solid var(--divider-color, #e1e4e8);
           border-radius: 18px;
           padding: 16px;
         }
@@ -981,8 +982,8 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .report-card {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(148, 163, 184, 0.16);
+          background: var(--secondary-background-color, #f6f7f8);
+          border: 1px solid var(--divider-color, #e1e4e8);
           border-radius: 18px;
           padding: 16px;
         }
@@ -1028,7 +1029,7 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .import-zone {
-          background: rgba(255, 255, 255, 0.03);
+          background: var(--secondary-background-color, #f6f7f8);
           border: 2px dashed rgba(148, 163, 184, 0.35);
           border-radius: 20px;
           display: grid;
@@ -1051,7 +1052,7 @@ class FinanceTrackerPanel extends HTMLElement {
         .error,
         .empty,
         .placeholder {
-          background: rgba(255, 255, 255, 0.03);
+          background: var(--secondary-background-color, #f6f7f8);
           border: 1px dashed rgba(148, 163, 184, 0.32);
           border-radius: 18px;
           color: var(--secondary-text-color);
@@ -1071,10 +1072,9 @@ class FinanceTrackerPanel extends HTMLElement {
         <div class="shell">
           <div class="hero">
             <div class="eyebrow">Finance Tracker</div>
-            <h1>Household finance, inside Home Assistant.</h1>
+            <h1>Plan, pay, and stay ahead.</h1>
             <div class="subtitle">
-              Current Month is live first. The remaining routes are scaffolded so the panel can grow into
-              expense master management, year setup, history, and settings without another frontend reset.
+              Manage recurring expenses, annual plans, payments, history, and reminders without leaving Home Assistant.
             </div>
           </div>
           <div class="tabs">
@@ -1153,6 +1153,7 @@ class FinanceTrackerPanel extends HTMLElement {
 
     this.shadowRoot.querySelector("[data-expense-cancel]")?.addEventListener("click", () => {
       this._editingExpenseId = null;
+      this._expenseDraft = null;
       this._expenseError = "";
       this.render();
     });
@@ -1160,6 +1161,7 @@ class FinanceTrackerPanel extends HTMLElement {
     this.shadowRoot.querySelectorAll("[data-expense-edit]").forEach((button) => {
       button.addEventListener("click", () => {
         this._editingExpenseId = button.dataset.expenseEdit;
+        this._expenseDraft = null;
         this._expenseError = "";
         this.render();
       });
@@ -1397,8 +1399,12 @@ class FinanceTrackerPanel extends HTMLElement {
     const editing = expenses.find(
       (expense) => expense.template_id === this._editingExpenseId
     );
-    const value = (field, fallback = "") => this._escape(editing?.[field] ?? fallback);
-    const recurrence = editing?.recurrence || "monthly";
+    const formState = this._expenseDraft || editing || {};
+    const value = (field, fallback = "") => {
+      const stateField = field === "default_amount" ? "amount" : field;
+      return this._escape(formState[stateField] ?? formState[field] ?? fallback);
+    };
+    const recurrence = formState.recurrence || "monthly";
     const recurrenceOptions = [
       ["monthly", "Monthly"],
       ["one_time", "One time"],
@@ -1480,7 +1486,7 @@ class FinanceTrackerPanel extends HTMLElement {
               </div>
               <div class="field full">
                 <label for="expense-custom-months">Custom months</label>
-                <input id="expense-custom-months" name="custom_months" value="${this._escape(editing?.custom_months?.join(",") || "")}" placeholder="1, 4, 7, 10">
+                <input id="expense-custom-months" name="custom_months" value="${this._escape(Array.isArray(formState.custom_months) ? formState.custom_months.join(",") : formState.custom_months || "")}" placeholder="1, 4, 7, 10">
               </div>
               <div class="field">
                 <label for="expense-reminders">Reminder days</label>

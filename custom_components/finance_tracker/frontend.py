@@ -49,7 +49,7 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
         config={
             "_panel_custom": {
                 "name": PANEL_WEB_COMPONENT_NAME,
-                "embed_iframe": True,
+                "embed_iframe": False,
                 "trust_external": False,
                 "js_url": f"{PANEL_STATIC_URL}/{PANEL_ENTRYPOINT}",
             }
