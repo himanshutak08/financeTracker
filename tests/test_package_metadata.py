@@ -37,7 +37,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.2.10")
+        self.assertEqual(manifest["version"], "0.2.11")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -107,6 +107,16 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn("overflow-x: auto", panel_source)
         self.assertIn("grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr)", panel_source)
         self.assertIn("@media (max-width: 420px)", panel_source)
+
+    def test_status_and_archive_styles_use_high_contrast_tokens(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn("color: var(--success-color, #166534)", panel_source)
+        self.assertIn("color: var(--error-color, #b91c1c)", panel_source)
+        self.assertIn(".badge.archived", panel_source)
+        self.assertIn('<span class="badge archived">Archived</span>', panel_source)
+        self.assertNotIn("color: #86efac", panel_source)
+        self.assertNotIn("color: #fca5a5", panel_source)
 
 
 if __name__ == "__main__":

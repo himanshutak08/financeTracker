@@ -844,16 +844,44 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .badge {
+          border: 1px solid transparent;
           border-radius: 999px;
           font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
           padding: 6px 10px;
           text-transform: uppercase;
         }
 
-        .badge.pending { background: rgba(245, 158, 11, 0.18); color: #fbbf24; }
-        .badge.partial { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
-        .badge.overdue { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
-        .badge.paid { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+        .badge.pending {
+          background: rgba(245, 158, 11, 0.12);
+          border-color: rgba(245, 158, 11, 0.42);
+          color: var(--warning-color, #9a5b00);
+        }
+
+        .badge.partial {
+          background: rgba(59, 130, 246, 0.12);
+          border-color: rgba(59, 130, 246, 0.42);
+          color: var(--info-color, #1d4ed8);
+        }
+
+        .badge.overdue {
+          background: rgba(220, 38, 38, 0.10);
+          border-color: rgba(220, 38, 38, 0.40);
+          color: var(--error-color, #b91c1c);
+        }
+
+        .badge.paid {
+          background: rgba(34, 197, 94, 0.10);
+          border-color: rgba(34, 197, 94, 0.40);
+          color: var(--success-color, #166534);
+        }
+
+        .badge.archived {
+          background: rgba(100, 116, 139, 0.10);
+          border-color: rgba(100, 116, 139, 0.36);
+          color: var(--secondary-text-color);
+        }
 
         .meta {
           color: var(--secondary-text-color);
@@ -957,8 +985,9 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .danger-button {
-          background: rgba(239, 68, 68, 0.16);
-          color: #fca5a5;
+          background: var(--card-background-color, #fff);
+          border: 1px solid rgba(220, 38, 38, 0.45);
+          color: var(--error-color, #b91c1c);
         }
 
         button[disabled] {
@@ -1585,7 +1614,7 @@ class FinanceTrackerPanel extends HTMLElement {
                     <span>${this._escape(expense.category)}</span>
                     <span>${this._escape(expense.recurrence.replaceAll("_", " "))}</span>
                     <span>Due day ${this._escape(expense.due_day || "—")}</span>
-                    ${expense.is_active ? "" : "<span>Archived</span>"}
+                    ${expense.is_active ? "" : '<span class="badge archived">Archived</span>'}
                   </div>
                 </div>
                 <div class="expense-amount">${this._escape(expense.default_amount.toFixed(2))}</div>
