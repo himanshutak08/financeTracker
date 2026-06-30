@@ -216,6 +216,10 @@ class FinanceTrackerStorage:
         """Delete one generated month ledger and its payments."""
         return await self.hass.async_add_executor_job(self._delete_month, month_key)
 
+    async def async_generate_month(self, month_key: str) -> dict[str, Any]:
+        """Rebuild one month ledger from an existing year plan."""
+        return await self.hass.async_add_executor_job(self._generate_month, month_key)
+
     async def async_reset_database(self) -> dict[str, Any]:
         """Delete all Finance Tracker user data while keeping the schema."""
         return await self.hass.async_add_executor_job(self._reset_database)
@@ -1066,6 +1070,117 @@ class FinanceTrackerStorage:
             "month_key": normalized_month,
             "deleted_entries": len(entry_ids),
             "deleted_payments": payment_count,
+        }
+
+    def _generate_month(self, month_key: str) -> dict[str, Any]:
+        normalized_month = str(month_key or "").strip()
+        if not _is_month_key(normalized_month):
+            raise HomeAssistantError("month_key must use YYYY-MM format")
+
+        plan_year = int(normalized_month[:4])
+        month_number = int(normalized_month[5:7])
+        now = _utcnow()
+
+        with self._connect() as conn:
+            plan_row = conn.execute(
+                """
+                SELECT year_plan_id, status
+                FROM year_plans
+                WHERE plan_year = ?
+                """,
+                (plan_year,),
+            ).fetchone()
+            if plan_row is None:
+                raise HomeAssistantError(
+                    f"Generate year {plan_year} first, then generate {normalized_month}"
+                )
+
+            plan_items = conn.execute(
+                """
+                SELECT
+                    ypi.plan_item_id,
+                    ypi.template_id,
+                    ypi.scheduled_amount,
+                    ypi.due_day,
+                    ypi.due_date,
+                    et.name,
+                    et.category,
+                    et.icon,
+                    et.notes
+                FROM year_plan_items ypi
+                JOIN expense_templates et ON et.template_id = ypi.template_id
+                WHERE ypi.year_plan_id = ? AND ypi.month_number = ?
+                ORDER BY ypi.due_date, ypi.template_id
+                """,
+                (plan_row["year_plan_id"], month_number),
+            ).fetchall()
+            if not plan_items:
+                raise HomeAssistantError(
+                    f"No plan rows found for {normalized_month}. Add/import expenses and generate {plan_year} first."
+                )
+
+            existing_entry_ids = [
+                row["entry_id"]
+                for row in conn.execute(
+                    "SELECT entry_id FROM month_entries WHERE month_key = ?",
+                    (normalized_month,),
+                ).fetchall()
+            ]
+            deleted_payments = self._delete_month_entries(conn, existing_entry_ids)
+
+            for item in plan_items:
+                due_day = item["due_day"]
+                amount = float(item["scheduled_amount"])
+                status = _status_for_amounts(amount, 0.0)
+                conn.execute(
+                    """
+                    INSERT INTO month_entries (
+                        entry_id, plan_item_id, template_id, month_key, display_order,
+                        name, category, icon, scheduled_amount, actual_paid_amount,
+                        remaining_amount, due_date, status, notes, paid_date,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, NULL, ?, ?)
+                    """,
+                    (
+                        uuid4().hex,
+                        item["plan_item_id"],
+                        item["template_id"],
+                        normalized_month,
+                        _display_order_for_month_key(normalized_month, due_day),
+                        item["name"],
+                        item["category"],
+                        item["icon"],
+                        amount,
+                        amount,
+                        item["due_date"],
+                        status,
+                        item["notes"],
+                        now,
+                        now,
+                    ),
+                )
+
+            self._insert_audit_event(
+                conn,
+                "month_entries",
+                normalized_month,
+                "month_generated",
+                {
+                    "month_key": normalized_month,
+                    "year": plan_year,
+                    "created_entries": len(plan_items),
+                    "replaced_entries": len(existing_entry_ids),
+                    "deleted_payments": deleted_payments,
+                },
+            )
+
+        return {
+            "month_key": normalized_month,
+            "year": plan_year,
+            "created_entries": len(plan_items),
+            "replaced_entries": len(existing_entry_ids),
+            "deleted_payments": deleted_payments,
+            "plan_status": plan_row["status"],
         }
 
     def _reset_database(self) -> dict[str, Any]:

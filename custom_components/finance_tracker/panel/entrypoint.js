@@ -582,6 +582,40 @@ class FinanceTrackerPanel extends HTMLElement {
     }
   }
 
+  async generateMonth(monthKey) {
+    if (!this._hass || this._settingsBusy) {
+      return;
+    }
+    const targetMonth = String(monthKey || "").trim();
+    if (!targetMonth) {
+      this._settingsError = "Choose a month to generate.";
+      this.render();
+      return;
+    }
+    if (!window.confirm(`Generate the ${targetMonth} month ledger from the existing year plan? Existing entries for that month will be replaced.`)) {
+      return;
+    }
+
+    this._settingsBusy = true;
+    this._settingsError = "";
+    this._cleanupResult = null;
+    this.render();
+    try {
+      this._cleanupResult = await this._hass.connection.sendMessagePromise({
+        type: "finance_tracker/generate_month",
+        month_key: targetMonth,
+      });
+      if (targetMonth === this._monthKey) {
+        await this.loadCurrentMonth();
+      }
+    } catch (err) {
+      this._settingsError = err?.message || String(err);
+    } finally {
+      this._settingsBusy = false;
+      this.render();
+    }
+  }
+
   async resetDatabase() {
     if (!this._hass || this._settingsBusy) {
       return;
@@ -1045,7 +1079,6 @@ class FinanceTrackerPanel extends HTMLElement {
           margin-bottom: 18px;
         }
 
-        .toolbar button,
         .pay-button {
           background: var(--primary-color);
           border: 0;
@@ -1057,7 +1090,9 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .pay-button[disabled],
-        .toolbar button[disabled] {
+        .primary-button[disabled],
+        .secondary-button[disabled],
+        .danger-button[disabled] {
           cursor: progress;
           opacity: 0.65;
         }
@@ -1090,6 +1125,7 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .entry-tools {
+          align-items: center;
           display: flex;
           flex-wrap: wrap;
           gap: 12px;
@@ -1240,6 +1276,7 @@ class FinanceTrackerPanel extends HTMLElement {
 
         .form-actions,
         .expense-actions {
+          align-items: center;
           display: flex;
           flex-wrap: wrap;
           gap: 8px;
@@ -1536,6 +1573,7 @@ class FinanceTrackerPanel extends HTMLElement {
           .entry { grid-template-columns: 1fr; }
           .amounts { justify-items: start; text-align: left; }
           .toolbar { align-items: flex-start; flex-direction: column; }
+          .toolbar .form-actions { width: 100%; }
           .expense-layout, .form-grid { grid-template-columns: 1fr; }
           .field.full { grid-column: auto; }
           .inline-form { align-items: stretch; flex-direction: column; }
@@ -1749,6 +1787,16 @@ class FinanceTrackerPanel extends HTMLElement {
       this.deleteMonth(data.get("month_key"));
     });
 
+    this.shadowRoot.querySelector("[data-generate-month-form]")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      this.generateMonth(data.get("month_key"));
+    });
+
+    this.shadowRoot.querySelector("[data-generate-current-month]")?.addEventListener("click", () => {
+      this.generateMonth(this._monthKey);
+    });
+
     this.shadowRoot.querySelector("[data-clear-reminder-log]")?.addEventListener("click", () => {
       this.clearReminderLog();
     });
@@ -1819,12 +1867,16 @@ class FinanceTrackerPanel extends HTMLElement {
         <br>
         <div class="toolbar">
           <div>No month entries yet.</div>
-          <button data-refresh>Refresh</button>
+          <div class="form-actions">
+            <button class="secondary-button" data-refresh>Refresh</button>
+            <button class="primary-button" data-generate-current-month>Generate this month</button>
+          </div>
         </div>
         <div class="empty">
           <div class="getting-started">
             <strong>Getting started</strong>
             <div>Current Month appears after you add expenses, generate a year plan, and activate it.</div>
+            <div class="meta">If this month was wiped, click <strong>Generate this month</strong> to recreate it from the existing year plan.</div>
             <div class="checklist">
               <div class="checklist-item">
                 <span class="checklist-number">1</span>
@@ -1873,6 +1925,11 @@ class FinanceTrackerPanel extends HTMLElement {
                 <span>Paid ${this._escape(this.formatAmount(entry.actual_paid_amount))}</span>
               </div>
               <div class="entry-tools">
+                ${
+                  entry.latest_payment_id
+                    ? `<button class="secondary-button" type="button" data-undo-payment="${this._escape(entry.latest_payment_id)}" data-undo-payment-label="${this._escape(`the latest payment for ${entry.name}`)}" ${disabled}>Undo last payment</button>`
+                    : ""
+                }
                 ${entry.remaining_amount > 0 ? `
                   <details>
                     <summary>Record partial payment</summary>
@@ -1933,11 +1990,6 @@ class FinanceTrackerPanel extends HTMLElement {
                   ? `<button class="pay-button" data-entry-id="${entry.entry_id}" ${disabled}>${buttonLabel}</button>`
                   : ""
               }
-              ${
-                entry.latest_payment_id
-                  ? `<button class="secondary-button" data-undo-payment="${this._escape(entry.latest_payment_id)}" data-undo-payment-label="${this._escape(`the latest payment for ${entry.name}`)}" ${disabled}>Undo last payment</button>`
-                  : ""
-              }
             </div>
           </div>
         `;
@@ -1953,7 +2005,7 @@ class FinanceTrackerPanel extends HTMLElement {
           <div>${this._escape(data.month_key || "Unknown month")}</div>
         </div>
         <div class="form-actions">
-          <button data-refresh ${this._loading ? "disabled" : ""}>Refresh</button>
+          <button class="secondary-button" data-refresh ${this._loading ? "disabled" : ""}>Refresh</button>
           <button class="secondary-button" data-export-current ${this._loading ? "disabled" : ""}>Export CSV</button>
         </div>
       </div>
@@ -2039,7 +2091,7 @@ class FinanceTrackerPanel extends HTMLElement {
           <div>${expenses.length} expense${expenses.length === 1 ? "" : "s"}</div>
         </div>
         <div class="form-actions">
-          <button data-expense-refresh ${this._expenseLoading || this._expenseBusy ? "disabled" : ""}>Refresh</button>
+          <button class="secondary-button" data-expense-refresh ${this._expenseLoading || this._expenseBusy ? "disabled" : ""}>Refresh</button>
           <button class="secondary-button" data-export-expenses ${expenses.length === 0 ? "disabled" : ""}>Export CSV</button>
         </div>
       </div>
@@ -2243,7 +2295,7 @@ class FinanceTrackerPanel extends HTMLElement {
           ${plan ? `<div class="meta"><span>Status: ${this._escape(plan.plan.status)}</span><span>${plan.item_count} entries</span></div>` : ""}
           <div class="meta">After importing expenses, generate this year, review the draft, then activate it to populate Current Month.</div>
         </div>
-        ${isDraft ? `<button data-year-activate ${disabled}>Activate year</button>` : ""}
+        ${isDraft ? `<button class="primary-button" data-year-activate ${disabled}>Activate year</button>` : ""}
       </div>
       ${this._yearError ? `<div class="error">${this._escape(this._yearError)}</div><br>` : ""}
       <div class="year-controls">
@@ -2399,6 +2451,59 @@ class FinanceTrackerPanel extends HTMLElement {
     `;
   }
 
+  renderCleanupResult(cleanup) {
+    if (!cleanup) {
+      return "";
+    }
+    if (cleanup.deleted_counts) {
+      return `
+        <div class="empty">
+          <strong>Finance data reset.</strong>
+          <p>All expenses, generated years, month ledgers, payments, reminders, and settings were removed.</p>
+          <div class="form-actions">
+            <button class="primary-button" data-route="import">Bulk Import</button>
+            <button class="secondary-button" data-route="add">Add Expense</button>
+          </div>
+        </div>
+        <br>
+      `;
+    }
+    if (cleanup.year && cleanup.deleted_entries !== undefined) {
+      return `
+        <div class="empty">
+          <strong>Year ${this._escape(cleanup.year)} deleted.</strong>
+          <p>${this._escape(cleanup.deleted_entries)} ledger rows and ${this._escape(cleanup.deleted_payments || 0)} payments were removed. To add it back, open Year Setup and generate ${this._escape(cleanup.year)} again.</p>
+          <div class="form-actions">
+            <button class="primary-button" data-route="year-setup">Open Year Setup</button>
+          </div>
+        </div>
+        <br>
+      `;
+    }
+    if (cleanup.month_key && cleanup.created_entries !== undefined) {
+      return `
+        <div class="empty">
+          <strong>Month ${this._escape(cleanup.month_key)} generated.</strong>
+          <p>${this._escape(cleanup.created_entries)} ledger rows were created from the existing year plan.</p>
+          <div class="form-actions">
+            <button class="primary-button" data-route="current">Open Current Month</button>
+          </div>
+        </div>
+        <br>
+      `;
+    }
+    if (cleanup.month_key && cleanup.deleted_entries !== undefined) {
+      return `
+        <div class="empty">
+          <strong>Month ${this._escape(cleanup.month_key)} wiped.</strong>
+          <p>${this._escape(cleanup.deleted_entries)} ledger rows and ${this._escape(cleanup.deleted_payments || 0)} payments were removed. Use Generate month below to recreate only this month from the year plan.</p>
+        </div>
+        <br>
+      `;
+    }
+    return `<div class="empty">Cleanup complete.</div><br>`;
+  }
+
   renderSettings() {
     if (this._settingsLoading && !this._settings) {
       return `<div class="placeholder">Loading settings...</div>`;
@@ -2421,7 +2526,7 @@ class FinanceTrackerPanel extends HTMLElement {
       </div>
       ${this._settingsError ? `<div class="error">${this._escape(this._settingsError)}</div><br>` : ""}
       ${result ? `<div class="empty">Reminder scan complete: ${this._escape(result.sent ?? 0)} sent, ${this._escape(result.failed ?? 0)} failed, ${this._escape(result.candidates ?? 0)} eligible.</div><br>` : ""}
-      ${cleanup ? `<div class="empty">Cleanup complete: ${this._escape(JSON.stringify(cleanup))}</div><br>` : ""}
+      ${this.renderCleanupResult(cleanup)}
       <div class="expense-layout">
         <section>
           <form class="expense-form" data-settings-form>
@@ -2461,6 +2566,7 @@ class FinanceTrackerPanel extends HTMLElement {
           <div class="eyebrow">Cleanup Tools</div>
           <div class="section-title">Safe maintenance</div>
           <p class="meta">These actions do not remove expense definitions or delete the Finance Tracker database. Use them when testing or rebuilding a generated year.</p>
+          <p class="meta">If you delete a year, open Year Setup and Generate that year again. If you wipe a month, use Generate month here to recreate only that month.</p>
           <form class="inline-form" data-delete-year-form>
             <div class="field">
               <label>Year to delete</label>
@@ -2474,6 +2580,13 @@ class FinanceTrackerPanel extends HTMLElement {
               <input name="month_key" type="month" value="${this._escape(this._monthKey)}" required>
             </div>
             <button class="danger-button" type="submit" ${this._settingsBusy ? "disabled" : ""}>Wipe month ledger</button>
+          </form>
+          <form class="inline-form" data-generate-month-form style="margin-top:12px">
+            <div class="field">
+              <label>Month to generate</label>
+              <input name="month_key" type="month" value="${this._escape(this._monthKey)}" required>
+            </div>
+            <button class="primary-button" type="submit" ${this._settingsBusy ? "disabled" : ""}>Generate month</button>
           </form>
           <div class="form-actions" style="margin-top:12px">
             <button class="secondary-button" type="button" data-clear-reminder-log ${this._settingsBusy ? "disabled" : ""}>Clear reminder log</button>

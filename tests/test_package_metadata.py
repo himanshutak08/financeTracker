@@ -82,7 +82,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.3.1")
+        self.assertEqual(manifest["version"], "0.3.2")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -161,18 +161,23 @@ class PackageMetadataTests(unittest.TestCase):
 
         self.assertIn("data-delete-year-form", panel_source)
         self.assertIn("data-delete-month-form", panel_source)
+        self.assertIn("data-generate-month-form", panel_source)
+        self.assertIn("data-generate-current-month", panel_source)
         self.assertIn("data-reset-database", panel_source)
         self.assertIn("data-clear-reminder-log", panel_source)
         self.assertIn('type: "finance_tracker/delete_year_plan"', panel_source)
         self.assertIn('type: "finance_tracker/delete_month"', panel_source)
+        self.assertIn('type: "finance_tracker/generate_month"', panel_source)
         self.assertIn('type: "finance_tracker/reset_database"', panel_source)
         self.assertIn('type: "finance_tracker/clear_reminder_log"', panel_source)
         self.assertIn('"finance_tracker/delete_year_plan"', websocket_source)
         self.assertIn('"finance_tracker/delete_month"', websocket_source)
+        self.assertIn('"finance_tracker/generate_month"', websocket_source)
         self.assertIn('"finance_tracker/reset_database"', websocket_source)
         self.assertIn('"finance_tracker/clear_reminder_log"', websocket_source)
         self.assertIn("async_delete_year_plan", storage_source)
         self.assertIn("async_delete_month", storage_source)
+        self.assertIn("async_generate_month", storage_source)
         self.assertIn("async_reset_database", storage_source)
         self.assertIn("async_clear_reminder_log", storage_source)
 
@@ -217,7 +222,18 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn("No payments recorded for this year.", panel_source)
         self.assertIn('data-route="year-setup">Open Year Setup', panel_source)
         self.assertIn('data-route="current">Open Current Month', panel_source)
+        self.assertIn("Generate this month", panel_source)
+        self.assertIn("If this month was wiped", panel_source)
         self.assertIn('querySelectorAll("[data-year-generate]")', panel_source)
+
+    def test_panel_buttons_keep_intended_visual_style(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertNotIn(".toolbar button,\n        .pay-button", panel_source)
+        self.assertIn('class="secondary-button" data-refresh', panel_source)
+        self.assertIn('class="secondary-button" data-expense-refresh', panel_source)
+        self.assertIn('class="primary-button" data-year-activate', panel_source)
+        self.assertIn("toolbar .form-actions", panel_source)
 
     def test_panel_has_no_stale_scaffold_copy(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()

@@ -251,6 +251,40 @@ class FinanceTrackerStorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(reset["deleted_counts"]["expense_templates"], 1)
         self.assertEqual(catalog["count"], 0)
 
+    async def test_generate_month_restores_wiped_month_from_year_plan(self) -> None:
+        await self._add_monthly_expense()
+        await self.storage.async_generate_year(2027)
+
+        deleted_month = await self.storage.async_delete_month("2027-01")
+        empty_january = await self.storage.async_get_current_month(month_key="2027-01")
+        generated_month = await self.storage.async_generate_month("2027-01")
+        restored_january = await self.storage.async_get_current_month(month_key="2027-01")
+
+        self.assertEqual(deleted_month["deleted_entries"], 1)
+        self.assertEqual(empty_january["entry_count"], 0)
+        self.assertEqual(generated_month["created_entries"], 1)
+        self.assertEqual(generated_month["replaced_entries"], 0)
+        self.assertEqual(restored_january["entry_count"], 1)
+        self.assertEqual(restored_january["entries"][0]["status"], "pending")
+
+    async def test_undo_payment_refreshes_current_month_status_and_latest_payment(self) -> None:
+        await self._add_monthly_expense()
+        await self.storage.async_generate_year(2027)
+        january = await self.storage.async_get_current_month(month_key="2027-01")
+        entry_id = january["entries"][0]["entry_id"]
+
+        payment = await self.storage.async_mark_paid(entry_id, 100.0, "2027-01-10", None)
+        paid_january = await self.storage.async_get_current_month(month_key="2027-01")
+        undo = await self.storage.async_undo_payment(payment["payment_id"])
+        unpaid_january = await self.storage.async_get_current_month(month_key="2027-01")
+
+        self.assertEqual(paid_january["entries"][0]["status"], "paid")
+        self.assertEqual(paid_january["entries"][0]["latest_payment_id"], payment["payment_id"])
+        self.assertEqual(undo["status"], "pending")
+        self.assertIsNone(unpaid_january["entries"][0]["latest_payment_id"])
+        self.assertEqual(unpaid_january["entries"][0]["actual_paid_amount"], 0.0)
+        self.assertEqual(unpaid_january["entries"][0]["status"], "pending")
+
     async def test_current_month_filters_by_status_and_category(self) -> None:
         await self._add_monthly_expense()
         await self.storage.async_add_expense(

@@ -25,6 +25,7 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_import_expenses_file)
     websocket_api.async_register_command(hass, ws_delete_year_plan)
     websocket_api.async_register_command(hass, ws_delete_month)
+    websocket_api.async_register_command(hass, ws_generate_month)
     websocket_api.async_register_command(hass, ws_reset_database)
     websocket_api.async_register_command(hass, ws_clear_reminder_log)
 
@@ -235,6 +236,29 @@ async def ws_delete_month(
     """Delete one generated month ledger."""
     try:
         result = await _storage(hass).async_delete_month(msg["month_key"])
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "home_assistant_error", str(err))
+        return
+
+    connection.send_message(websocket_api.result_message(msg["id"], result))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "finance_tracker/generate_month",
+        vol.Required("month_key"): str,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_generate_month(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Generate one month ledger from an existing year plan."""
+    try:
+        result = await _storage(hass).async_generate_month(msg["month_key"])
     except HomeAssistantError as err:
         connection.send_error(msg["id"], "home_assistant_error", str(err))
         return
