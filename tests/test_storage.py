@@ -184,6 +184,41 @@ class FinanceTrackerStorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(complete_catalog["count"], 1)
         self.assertFalse(complete_catalog["expenses"][0]["is_active"])
 
+        await self.storage.async_update_expense(
+            created["template_id"],
+            {"is_active": True},
+        )
+        reactivated_catalog = await self.storage.async_list_expenses(active_only=True)
+        self.assertEqual(reactivated_catalog["count"], 1)
+
+    async def test_duplicate_expense_definitions_are_rejected(self) -> None:
+        created = await self._add_monthly_expense()
+
+        with self.assertRaisesRegex(Exception, "Duplicate expense 'Electricity'"):
+            await self._add_monthly_expense()
+
+        await self.storage.async_add_expense(
+            {
+                "name": "Water",
+                "category": "Utilities",
+                "recurrence": "monthly",
+                "amount": 100.0,
+                "due_day": 15,
+            }
+        )
+        with self.assertRaisesRegex(Exception, "Duplicate expense 'Water'"):
+            await self.storage.async_update_expense(
+                created["template_id"],
+                {"name": "Water"},
+            )
+
+    async def test_archived_duplicate_must_be_reactivated(self) -> None:
+        created = await self._add_monthly_expense()
+        await self.storage.async_archive_expense(created["template_id"])
+
+        with self.assertRaisesRegex(Exception, "Reactivate it instead"):
+            await self._add_monthly_expense()
+
     async def test_year_plan_adjustment_updates_plan_and_month_ledger(self) -> None:
         await self._add_monthly_expense()
         await self.storage.async_generate_year(2027)

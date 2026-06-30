@@ -337,7 +337,7 @@ class FinanceTrackerPanel extends HTMLElement {
       return;
     }
     const expense = this._expenses?.expenses?.find((item) => item.template_id === templateId);
-    if (!expense || !window.confirm(`Archive ${expense.name}? Existing month history will be preserved.`)) {
+    if (!expense || !window.confirm(`Safe delete ${expense.name}? Existing month history will be preserved, but future generated years will skip it.`)) {
       return;
     }
 
@@ -352,6 +352,32 @@ class FinanceTrackerPanel extends HTMLElement {
         this._editingExpenseId = null;
         this._expenseDraft = null;
       }
+      await this.loadExpenses();
+    } catch (err) {
+      this._expenseError = err?.message || String(err);
+    } finally {
+      this._expenseBusy = false;
+      this.render();
+    }
+  }
+
+  async reactivateExpense(templateId) {
+    if (!this._hass || this._expenseBusy) {
+      return;
+    }
+    const expense = this._expenses?.expenses?.find((item) => item.template_id === templateId);
+    if (!expense || !window.confirm(`Reactivate ${expense.name}? It will be included in future generated years.`)) {
+      return;
+    }
+
+    this._expenseBusy = true;
+    this._expenseError = "";
+    this.render();
+    try {
+      await this._hass.callService("finance_tracker", "update_expense", {
+        template_id: templateId,
+        is_active: true,
+      });
       await this.loadExpenses();
     } catch (err) {
       this._expenseError = err?.message || String(err);
@@ -1720,6 +1746,10 @@ class FinanceTrackerPanel extends HTMLElement {
       button.addEventListener("click", () => this.archiveExpense(button.dataset.expenseArchive));
     });
 
+    this.shadowRoot.querySelectorAll("[data-expense-reactivate]").forEach((button) => {
+      button.addEventListener("click", () => this.reactivateExpense(button.dataset.expenseReactivate));
+    });
+
     this.shadowRoot.querySelector("[data-year-load]")?.addEventListener("submit", (event) => {
       event.preventDefault();
       const data = new FormData(event.currentTarget);
@@ -2079,7 +2109,11 @@ class FinanceTrackerPanel extends HTMLElement {
               ${expense.notes ? `<div class="meta">${this._escape(expense.notes)}</div>` : ""}
               <div class="expense-actions">
                 <button class="secondary-button" data-expense-edit="${expense.template_id}" ${this._expenseBusy ? "disabled" : ""}>Edit</button>
-                ${expense.is_active ? `<button class="danger-button" data-expense-archive="${expense.template_id}" ${this._expenseBusy ? "disabled" : ""}>Archive</button>` : ""}
+                ${
+                  expense.is_active
+                    ? `<button class="danger-button" data-expense-archive="${expense.template_id}" ${this._expenseBusy ? "disabled" : ""}>Safe delete</button>`
+                    : `<button class="primary-button" data-expense-reactivate="${expense.template_id}" ${this._expenseBusy ? "disabled" : ""}>Reactivate</button>`
+                }
               </div>
             </div>
           `).join("")}</div>`;

@@ -82,7 +82,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.3.2")
+        self.assertEqual(manifest["version"], "0.3.3")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -195,7 +195,8 @@ class PackageMetadataTests(unittest.TestCase):
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
 
         self.assertIn("Mark ${entry.name} as paid", panel_source)
-        self.assertIn("Archive ${expense.name}", panel_source)
+        self.assertIn("Safe delete ${expense.name}", panel_source)
+        self.assertIn("Reactivate ${expense.name}", panel_source)
         self.assertIn("Generate or rebuild the ${this._planYear} draft", panel_source)
         self.assertIn("Activate the ${this._planYear} plan", panel_source)
         self.assertIn("Copy ${sourceYear} into ${targetYear}", panel_source)
@@ -212,6 +213,16 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn('"undo_payment"', panel_source)
         self.assertIn("latest_payment_id", storage_source)
         self.assertIn("latest_payment_amount", storage_source)
+
+    def test_expense_catalog_exposes_safe_delete_and_reactivate(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+        storage_source = (INTEGRATION / "storage.py").read_text()
+
+        self.assertIn("Safe delete", panel_source)
+        self.assertIn("data-expense-reactivate", panel_source)
+        self.assertIn("reactivateExpense(templateId)", panel_source)
+        self.assertIn("Archived expense", storage_source)
+        self.assertIn("Reactivate it instead", storage_source)
 
     def test_empty_states_offer_next_actions(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()

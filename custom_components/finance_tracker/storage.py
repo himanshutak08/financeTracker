@@ -434,6 +434,7 @@ class FinanceTrackerStorage:
         template_id = uuid4().hex
 
         with self._connect() as conn:
+            self._raise_if_duplicate_expense(conn, payload)
             conn.execute(
                 """
                 INSERT INTO expense_templates (
@@ -720,11 +721,27 @@ class FinanceTrackerStorage:
         now = _utcnow()
         with self._connect() as conn:
             existing = conn.execute(
-                "SELECT template_id FROM expense_templates WHERE template_id = ?",
+                """
+                SELECT *
+                FROM expense_templates
+                WHERE template_id = ?
+                """,
                 (template_id,),
             ).fetchone()
             if existing is None:
                 raise HomeAssistantError(f"Unknown template_id: {template_id}")
+
+            duplicate_payload = {
+                "name": changes.get("name", existing["name"]),
+                "category": changes.get("category", existing["category"]),
+                "recurrence": changes.get("recurrence", existing["recurrence"]),
+                "amount": changes.get("amount", existing["default_amount"]),
+                "due_day": changes.get("due_day", existing["due_day"]),
+                "due_date": changes.get("due_date", existing["due_date"]),
+                "start_month": changes.get("start_month", existing["start_month"]),
+                "end_month": changes.get("end_month", existing["end_month"]),
+            }
+            self._raise_if_duplicate_expense(conn, duplicate_payload, exclude_id=template_id)
 
             if updates:
                 values.extend([now, template_id])
@@ -788,6 +805,64 @@ class FinanceTrackerStorage:
             ).fetchone()
 
         return dict(row)
+
+    def _raise_if_duplicate_expense(
+        self,
+        conn: sqlite3.Connection,
+        payload: Mapping[str, Any],
+        exclude_id: str | None = None,
+    ) -> None:
+        """Reject exact duplicate recurring definitions, including archived ones."""
+
+        due_day = payload.get("due_day")
+        due_day = int(due_day) if due_day is not None else None
+        amount = round(float(payload.get("amount", 0)), 2)
+        params: list[Any] = [
+            str(payload.get("name", "")).strip().lower(),
+            str(payload.get("category", "")).strip().lower(),
+            str(payload.get("recurrence", "")).strip(),
+            amount,
+            due_day,
+            due_day,
+            payload.get("due_date"),
+            payload.get("due_date"),
+            payload.get("start_month"),
+            payload.get("start_month"),
+            payload.get("end_month"),
+            payload.get("end_month"),
+        ]
+        exclude_clause = ""
+        if exclude_id:
+            exclude_clause = "AND template_id != ?"
+            params.append(exclude_id)
+
+        row = conn.execute(
+            f"""
+            SELECT template_id, name, is_active
+            FROM expense_templates
+            WHERE lower(trim(name)) = ?
+              AND lower(trim(category)) = ?
+              AND recurrence = ?
+              AND abs(default_amount - ?) < 0.005
+              AND ((due_day IS NULL AND ? IS NULL) OR due_day = ?)
+              AND ((due_date IS NULL AND ? IS NULL) OR due_date = ?)
+              AND ((start_month IS NULL AND ? IS NULL) OR start_month = ?)
+              AND ((end_month IS NULL AND ? IS NULL) OR end_month = ?)
+              {exclude_clause}
+            LIMIT 1
+            """,
+            params,
+        ).fetchone()
+        if row is None:
+            return
+
+        if bool(row["is_active"]):
+            raise HomeAssistantError(
+                f"Duplicate expense '{row['name']}' already exists. Edit the existing entry instead."
+            )
+        raise HomeAssistantError(
+            f"Archived expense '{row['name']}' already exists. Reactivate it instead of creating a duplicate."
+        )
 
     def _generate_year(self, plan_year: int) -> dict[str, Any]:
         if plan_year < 2000 or plan_year > 2100:
