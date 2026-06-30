@@ -582,16 +582,38 @@ class FinanceTrackerPanel extends HTMLElement {
           font-family: Roboto, "Segoe UI", sans-serif;
         }
 
+        *,
+        *::before,
+        *::after {
+          box-sizing: border-box;
+        }
+
         .app {
           min-height: 100vh;
           background: var(--primary-background-color, #f4f6f8);
           padding: clamp(16px, 3vw, 36px);
-          box-sizing: border-box;
+          overflow-x: hidden;
+          width: 100%;
         }
 
         .shell {
           max-width: 1200px;
           margin: 0 auto;
+          min-width: 0;
+        }
+
+        .app-header {
+          align-items: center;
+          background: var(--app-header-background-color, var(--primary-color));
+          color: var(--app-header-text-color, var(--text-primary-color, #fff));
+          display: none;
+          font-size: 20px;
+          font-weight: 500;
+          min-height: 56px;
+          padding: 0 16px;
+          position: sticky;
+          top: 0;
+          z-index: 1;
         }
 
         .hero {
@@ -624,9 +646,12 @@ class FinanceTrackerPanel extends HTMLElement {
 
         .tabs {
           display: flex;
-          flex-wrap: wrap;
+          flex-wrap: nowrap;
           gap: 8px;
           margin: 16px 0 20px;
+          overflow-x: auto;
+          padding-bottom: 2px;
+          scrollbar-width: thin;
         }
 
         .tab {
@@ -635,8 +660,10 @@ class FinanceTrackerPanel extends HTMLElement {
           border-radius: 10px;
           color: inherit;
           cursor: pointer;
+          flex: 0 0 auto;
           font: inherit;
           padding: 9px 14px;
+          white-space: nowrap;
         }
 
         .tab.active {
@@ -650,6 +677,7 @@ class FinanceTrackerPanel extends HTMLElement {
           border: 1px solid var(--divider-color, #e1e4e8);
           border-radius: 16px;
           box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+          overflow: hidden;
           padding: clamp(16px, 2.5vw, 28px);
         }
 
@@ -716,6 +744,7 @@ class FinanceTrackerPanel extends HTMLElement {
           display: grid;
           gap: 12px;
           grid-template-columns: 1fr auto;
+          min-width: 0;
           padding: 16px;
         }
 
@@ -762,6 +791,7 @@ class FinanceTrackerPanel extends HTMLElement {
         .name {
           font-size: 18px;
           font-weight: 700;
+          overflow-wrap: anywhere;
         }
 
         .badge {
@@ -798,7 +828,7 @@ class FinanceTrackerPanel extends HTMLElement {
         .expense-layout {
           display: grid;
           gap: 24px;
-          grid-template-columns: minmax(280px, 0.85fr) minmax(360px, 1.15fr);
+          grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
         }
 
         .section-title {
@@ -942,6 +972,7 @@ class FinanceTrackerPanel extends HTMLElement {
 
         .inline-form .field {
           flex: 1 1 110px;
+          min-width: 0;
         }
 
         .plan-list {
@@ -952,6 +983,7 @@ class FinanceTrackerPanel extends HTMLElement {
         .month-heading {
           align-items: center;
           display: flex;
+          flex-wrap: wrap;
           gap: 12px;
           justify-content: space-between;
           margin-bottom: 12px;
@@ -974,6 +1006,7 @@ class FinanceTrackerPanel extends HTMLElement {
           align-items: center;
           cursor: pointer;
           display: flex;
+          flex-wrap: wrap;
           gap: 12px;
           justify-content: space-between;
           list-style: none;
@@ -990,7 +1023,7 @@ class FinanceTrackerPanel extends HTMLElement {
         .report-grid {
           display: grid;
           gap: 18px;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
         }
 
         .report-card {
@@ -1035,6 +1068,7 @@ class FinanceTrackerPanel extends HTMLElement {
           align-items: center;
           border-top: 1px solid rgba(148, 163, 184, 0.14);
           display: flex;
+          flex-wrap: wrap;
           gap: 12px;
           justify-content: space-between;
           padding-top: 8px;
@@ -1061,6 +1095,15 @@ class FinanceTrackerPanel extends HTMLElement {
           padding: 5px 8px;
         }
 
+        .next-steps {
+          margin: 12px 0 0;
+          padding-left: 22px;
+        }
+
+        .next-steps li {
+          margin: 6px 0;
+        }
+
         .error,
         .empty,
         .placeholder {
@@ -1072,15 +1115,59 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         @media (max-width: 720px) {
-          .app { padding: 16px; }
+          .app { padding: 0 0 16px; }
+          .app-header { display: flex; }
+          .shell {
+            padding: 0 12px;
+            width: 100%;
+          }
+          .hero {
+            gap: 6px;
+            margin: 14px 0 10px;
+          }
+          h1 { font-size: 24px; }
+          .subtitle { font-size: 14px; }
+          .tabs {
+            margin: 10px -12px 12px;
+            padding: 0 12px 4px;
+          }
+          .tab { padding: 8px 12px; }
+          .panel {
+            border-radius: 14px;
+            padding: 12px;
+          }
+          .summary { grid-template-columns: 1fr 1fr; }
+          .metric { padding: 12px; }
+          .metric-value { font-size: 22px; }
           .entry { grid-template-columns: 1fr; }
           .amounts { justify-items: start; text-align: left; }
           .toolbar { align-items: flex-start; flex-direction: column; }
           .expense-layout, .form-grid { grid-template-columns: 1fr; }
           .field.full { grid-column: auto; }
+          .inline-form { align-items: stretch; flex-direction: column; }
+          .inline-form .field { flex-basis: auto; }
+          .form-actions button,
+          .expense-actions button,
+          .toolbar button,
+          .pay-button {
+            width: 100%;
+          }
+          .expense-card-top,
+          .report-label {
+            flex-direction: column;
+          }
+          .expense-amount,
+          .payment-row strong {
+            white-space: normal;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .summary { grid-template-columns: 1fr; }
         }
       </style>
       <div class="app">
+        <div class="app-header">Finance</div>
         <div class="shell">
           <div class="hero">
             <div class="eyebrow">Finance Tracker</div>
@@ -1544,9 +1631,16 @@ class FinanceTrackerPanel extends HTMLElement {
       ${response ? `
         <div class="empty">
           <strong>${this._escape(response.imported_count || 0)} expenses imported from ${this._escape(response.filename || "file")}.</strong>
+          <p>Import creates reusable expense definitions only. Create the yearly ledger next so Current Month can show payable entries.</p>
+          <ol class="next-steps">
+            <li>Open Year Setup.</li>
+            <li>Click Generate ${this._escape(this._planYear)} to create a draft from the imported expenses.</li>
+            <li>Review the draft amounts and dates, then Activate year.</li>
+            <li>Return to Current Month to record payments.</li>
+          </ol>
           ${imported.length ? `<div class="meta">${imported.map((expense) => this._escape(expense.name)).join(" · ")}</div>` : ""}
           <div class="form-actions" style="margin-top:12px">
-            <button class="primary-button" data-route="year-setup">Open Year Setup</button>
+            <button class="primary-button" data-route="year-setup">Next: Generate ${this._escape(this._planYear)}</button>
             <button class="secondary-button" data-route="add">Review expenses</button>
           </div>
         </div><br>
@@ -1645,6 +1739,7 @@ class FinanceTrackerPanel extends HTMLElement {
           <div class="eyebrow">Year Setup</div>
           <div class="section-title">Plan ${this._escape(this._planYear)}</div>
           ${plan ? `<div class="meta"><span>Status: ${this._escape(plan.plan.status)}</span><span>${plan.item_count} entries</span></div>` : ""}
+          <div class="meta">After importing expenses, generate this year, review the draft, then activate it to populate Current Month.</div>
         </div>
         ${isDraft ? `<button data-year-activate ${disabled}>Activate year</button>` : ""}
       </div>
@@ -1661,7 +1756,7 @@ class FinanceTrackerPanel extends HTMLElement {
           </form>
         </div>
         <div class="control-card">
-          <div class="eyebrow">Generate</div>
+          <div class="eyebrow">Step 1 · Generate</div>
           <p class="meta">Create or rebuild a draft from active expense definitions.</p>
           <button class="primary-button" data-year-generate ${disabled}>Generate ${this._escape(this._planYear)}</button>
         </div>
@@ -1857,7 +1952,7 @@ class FinanceTrackerPanel extends HTMLElement {
       <div class="placeholder">
         <div class="eyebrow">${this._escape(titles[route] || "Coming Soon")}</div>
         <div>
-          This route is scaffolded, but only Current Month is implemented in this first panel milestone.
+          This Finance Tracker route is not available yet. Use the tabs above to open a live workflow.
         </div>
       </div>
     `;

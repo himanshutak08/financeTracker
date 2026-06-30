@@ -37,7 +37,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.2.8")
+        self.assertEqual(manifest["version"], "0.2.9")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -81,6 +81,30 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertNotIn('"import_expenses_file",\n        { filename', panel_source)
         self.assertIn('"finance_tracker/import_expenses_file"', websocket_source)
         self.assertIn("parse_expense_file", websocket_source)
+
+    def test_bulk_import_explains_year_generation_next_step(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn("Import creates reusable expense definitions only", panel_source)
+        self.assertIn("Click Generate ${this._escape(this._planYear)}", panel_source)
+        self.assertIn("Next: Generate ${this._escape(this._planYear)}", panel_source)
+        self.assertIn("After importing expenses, generate this year", panel_source)
+
+    def test_panel_has_no_stale_scaffold_copy(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertNotIn("only Current Month is implemented", panel_source)
+        self.assertNotIn("first panel milestone", panel_source)
+
+    def test_panel_includes_mobile_header_and_responsive_guards(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn('<div class="app-header">Finance</div>', panel_source)
+        self.assertIn(".app-header { display: flex; }", panel_source)
+        self.assertIn("overflow-x: hidden", panel_source)
+        self.assertIn("overflow-x: auto", panel_source)
+        self.assertIn("grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr)", panel_source)
+        self.assertIn("@media (max-width: 420px)", panel_source)
 
 
 if __name__ == "__main__":

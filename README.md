@@ -1,95 +1,140 @@
-# Finance Tracker
+# Finance Tracker for Home Assistant
 
-Finance Tracker is a Home Assistant custom integration plus dedicated panel UI for managing recurring expenses, yearly planning, monthly ledger execution, payment history, and reminder workflows.
+Finance Tracker is a Home Assistant custom integration for managing household expenses inside Home Assistant. It adds a dedicated **Finance** sidebar panel where you can maintain recurring expenses, generate a yearly plan, track the current month, record payments, review history, and receive reminder notifications.
 
-## Development model
+The integration is designed for local-first personal finance tracking. Your data is stored in your Home Assistant config directory and is not sent to an external finance service.
 
-This repository is the source of truth for the project.
+## Features
 
-- Use direct local development during implementation.
-- Keep the live integration under `/homeassistant/custom_components/finance_tracker`.
-- Use HACS later for distribution testing and releases, not for every code change.
+- Dedicated Home Assistant sidebar panel.
+- Expense catalog for recurring and one-time expenses.
+- Bulk CSV/XLSX import with a downloadable sample CSV.
+- Year setup workflow to generate, review, and activate an annual expense plan.
+- Current Month ledger with unpaid items shown first.
+- Full and partial payment recording.
+- Month-specific edits for amount, due date, category, and notes.
+- History view with monthly, category, and payment breakdowns.
+- Configurable reminder notifications through Home Assistant notify services.
+- Local SQLite storage at `config/finance/tracker.db`.
 
-Project context and workflow docs live in:
+## Installation with HACS
 
-- `docs/working-spec.md`
-- `docs/development-workflow.md`
-- `docs/legacy-archive.md`
+Finance Tracker is currently installed as a custom HACS repository.
 
-## Initial scope
+1. Open **HACS → Integrations**.
+2. Open the menu and choose **Custom repositories**.
+3. Add this repository:
 
-The first implementation phases are:
+   ```text
+   https://github.com/himanshutak08/financeTracker
+   ```
 
-1. SQLite schema, migrations, and backend tests
-2. Core write services
-3. Current Month backend read models
-4. Dedicated panel routes and complete user workflows
-5. Reminder engine
-6. HACS import, clean-install validation, and release packaging
+4. Select category **Integration**.
+5. Install **Finance Tracker**.
+6. Restart Home Assistant.
+7. Go to **Settings → Devices & services → Add integration**.
+8. Search for **Finance Tracker** and complete setup.
+9. Open **Finance** from the Home Assistant sidebar.
 
-## Current implementation checkpoint
+## First use
 
-- SQLite storage and schema bootstrap are implemented in the custom integration.
-- Write services now cover expense management, year generation, payment recording, partial payments, month-entry updates, and payment undo.
-- Read models exist for expense listing, current month ledger, and year plan retrieval.
-- A websocket API now exposes those read models to the panel.
-- Home Assistant UI setup is supported through a single-instance config flow.
-- The sidebar panel provides Current Month, expense management, bulk import, Year Setup, History, and Settings workflows.
-- Bulk Import accepts UTF-8 CSV and Excel XLSX files with up to 1,000 expense definitions and provides a downloadable sample CSV.
-- Current Month supports month, status, and category filters; full or partial payments; and month-specific amount, due-date, category, and note editing.
-- History provides annual totals, monthly paid-vs-planned drill-downs, category breakdowns, and recorded payment transactions.
-- The reminder engine periodically delivers deduplicated upcoming, due, and overdue notifications through a configurable Home Assistant notification service.
-- Settings controls currency, reminder enablement, notification service, scan interval, and manual reminder scans.
+Finance Tracker uses a simple setup flow:
 
-## Backend tests
+1. Open **Finance → Add Expense** and add expenses manually, or open **Bulk Import** and upload a CSV/XLSX file.
+2. Open **Year Setup**.
+3. Click **Generate `<year>`** to create a draft yearly plan from your active expenses.
+4. Review the generated months, amounts, and due dates.
+5. Click **Activate year**.
+6. Open **Current Month** to record payments.
 
-Run the self-contained SQLite storage regression tests with:
+Bulk import only creates expense definitions. Current Month entries appear after you generate and activate a year plan.
+
+## Bulk import CSV format
+
+The Bulk Import screen includes a **Download sample CSV** button. CSV files should be UTF-8 encoded.
+
+Required columns:
+
+```text
+name,category,amount,recurrence
+```
+
+Optional columns:
+
+```text
+due_day,start_month,end_month,custom_months,icon,notes,reminder_days
+```
+
+Supported recurrence values:
+
+- `monthly`
+- `one_time`
+- `annual`
+- `twice_yearly`
+- `custom_months`
+
+For `custom_months`, use comma-separated month numbers such as `1,4,7,10`.
+
+Example:
+
+```csv
+name,category,amount,recurrence,due_day,start_month,end_month,custom_months,icon,notes,reminder_days
+Electricity,Utilities,2500,monthly,15,1,12,,mdi:lightning-bolt,Monthly power bill,3
+Insurance,Insurance,12000,annual,10,4,4,,mdi:shield-home,Annual home insurance,7
+Quarterly maintenance,Home,3000,custom_months,5,,,"1,4,7,10",mdi:tools,Quarterly maintenance,5
+```
+
+## Updating
+
+1. Back up Home Assistant, including `config/finance/tracker.db`.
+2. Update Finance Tracker from HACS.
+3. Restart Home Assistant.
+4. Reload the Finance panel in your browser or mobile app.
+
+Database migrations run automatically during startup. Do not replace `config/finance/tracker.db` with files from a release archive.
+
+## Removing
+
+1. Remove Finance Tracker from **Settings → Devices & services**.
+2. Remove the integration through HACS.
+3. Restart Home Assistant.
+
+Removing the integration unloads services, entities, reminders, and the Finance sidebar panel. The SQLite database is intentionally retained. Delete `config/finance/tracker.db` manually only if you want to permanently remove all finance history.
+
+## Troubleshooting
+
+### The Finance page still shows an old UI after updating
+
+Restart Home Assistant after every HACS update. If an old tab was already open, reload the browser tab or close and reopen the Home Assistant mobile app.
+
+### Bulk import succeeded but Current Month is empty
+
+Open **Year Setup**, click **Generate `<year>`**, review the draft, then click **Activate year**. Bulk import creates expense definitions; Year Setup creates the monthly ledger.
+
+### HACS download fails
+
+Confirm that HACS is installing the latest release and that the repository is added as an **Integration** custom repository.
+
+### Diagnostic entity reports an issue
+
+Check **Settings → System → Logs** and search for `finance_tracker`.
+
+## Data and privacy
+
+Finance data is stored locally in:
+
+```text
+config/finance/tracker.db
+```
+
+The integration does not require a cloud finance account and does not send expense data to an external service.
+
+## Development and validation
+
+Run the test suite with:
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
 The tests use temporary databases and do not read or modify live Home Assistant data.
-
-## Install with HACS
-
-Until the repository is added to the default HACS catalog, install it as a custom repository:
-
-1. In HACS, open **Integrations**.
-2. Open the menu and choose **Custom repositories**.
-3. Add `https://github.com/himanshutak08/financeTracker` with category **Integration**.
-4. Find **Finance Tracker** in HACS and install it.
-5. Restart Home Assistant.
-6. Open **Settings → Devices & services → Add integration**, search for **Finance Tracker**, and confirm setup.
-7. Open **Finance** from the Home Assistant sidebar.
-
-The panel is admin-only. Finance data is stored locally in `config/finance/tracker.db` and is not committed to this repository.
-
-## Upgrade
-
-1. Back up Home Assistant, including `config/finance/tracker.db`.
-2. Install the Finance Tracker update from HACS.
-3. Restart Home Assistant.
-4. Open the Finance panel and verify the diagnostic sensor reports `ready`.
-
-Database migrations run automatically during startup and preserve existing records. Never replace the database with files from a release archive.
-
-## Remove
-
-1. Remove Finance Tracker from **Settings → Devices & services**.
-2. Remove the integration through HACS and restart Home Assistant.
-3. Removing the integration stops reminder scheduling, unregisters services, unloads entities, and removes the Finance sidebar panel.
-4. The SQLite database is intentionally retained. Delete `config/finance/tracker.db` manually only if all finance history should be permanently removed.
-
-## Releases
-
-HACS releases should use semantic version tags such as `v0.2.8`. The tag version must match `custom_components/finance_tracker/manifest.json`, and each GitHub release should summarize migrations and user-visible changes.
-
-## Planned repository structure
-
-```text
-custom_components/finance_tracker/
-  panel/
-scripts/
-docs/
-```

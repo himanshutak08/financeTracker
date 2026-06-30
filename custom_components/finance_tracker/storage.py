@@ -1021,6 +1021,16 @@ class FinanceTrackerStorage:
             entries = [entry for entry in entries if entry["status"] == effective_status]
         if effective_category:
             entries = [entry for entry in entries if entry["category"] == effective_category]
+        entries = [
+            entry
+            for _, entry in sorted(
+                enumerate(entries),
+                key=lambda indexed_entry: (
+                    indexed_entry[1]["status"] == "paid",
+                    indexed_entry[0],
+                ),
+            )
+        ]
 
         summary = self._summarize_entries(entries)
         return {

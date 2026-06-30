@@ -234,6 +234,30 @@ class FinanceTrackerStorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(filtered["entries"][0]["name"], "Electricity")
         self.assertEqual(filtered["summary"]["status_counts"]["partial"], 1)
 
+    async def test_current_month_keeps_unpaid_entries_above_paid_entries(self) -> None:
+        await self._add_monthly_expense()
+        await self.storage.async_add_expense(
+            {
+                "name": "Rent",
+                "category": "Housing",
+                "recurrence": "monthly",
+                "amount": 500.0,
+                "due_day": 1,
+            }
+        )
+        await self.storage.async_generate_year(2027)
+        january = await self.storage.async_get_current_month(month_key="2027-01")
+        first_entry = january["entries"][0]
+
+        await self.storage.async_mark_paid(
+            first_entry["entry_id"], first_entry["remaining_amount"], "2027-01-05", None
+        )
+        reordered = await self.storage.async_get_current_month(month_key="2027-01")
+
+        self.assertEqual(reordered["entries"][0]["status"], "pending")
+        self.assertEqual(reordered["entries"][1]["status"], "paid")
+        self.assertEqual(reordered["entries"][1]["entry_id"], first_entry["entry_id"])
+
     async def test_history_returns_monthly_category_and_payment_rollups(self) -> None:
         await self._add_monthly_expense()
         await self.storage.async_generate_year(2027)
