@@ -607,13 +607,62 @@ class FinanceTrackerPanel extends HTMLElement {
           background: var(--app-header-background-color, var(--primary-color));
           color: var(--app-header-text-color, var(--text-primary-color, #fff));
           display: none;
+          gap: 16px;
           font-size: 20px;
           font-weight: 500;
           min-height: 56px;
-          padding: 0 16px;
+          padding: 0 8px;
           position: sticky;
           top: 0;
           z-index: 1;
+        }
+
+        .menu-button {
+          align-items: center;
+          background: transparent;
+          border: 0;
+          border-radius: 50%;
+          color: inherit;
+          cursor: pointer;
+          display: inline-flex;
+          height: 48px;
+          justify-content: center;
+          padding: 0;
+          width: 48px;
+        }
+
+        .menu-button:focus-visible {
+          outline: 2px solid currentColor;
+          outline-offset: -8px;
+        }
+
+        .menu-button-icon,
+        .menu-button-icon::before,
+        .menu-button-icon::after {
+          background: currentColor;
+          border-radius: 999px;
+          content: "";
+          display: block;
+          height: 2px;
+          width: 22px;
+        }
+
+        .menu-button-icon {
+          position: relative;
+        }
+
+        .menu-button-icon::before,
+        .menu-button-icon::after {
+          left: 0;
+          position: absolute;
+        }
+
+        .menu-button-icon::before {
+          top: -7px;
+        }
+
+        .menu-button-icon::after {
+          top: 7px;
         }
 
         .hero {
@@ -1167,7 +1216,12 @@ class FinanceTrackerPanel extends HTMLElement {
         }
       </style>
       <div class="app">
-        <div class="app-header">Finance</div>
+        <div class="app-header">
+          <button class="menu-button" type="button" data-toggle-menu aria-label="Open Home Assistant menu">
+            <span class="menu-button-icon" aria-hidden="true"></span>
+          </button>
+          <span>Finance</span>
+        </div>
         <div class="shell">
           <div class="hero">
             <div class="eyebrow">Finance Tracker</div>
@@ -1194,6 +1248,10 @@ class FinanceTrackerPanel extends HTMLElement {
 
     this.shadowRoot.querySelectorAll("[data-route]").forEach((button) => {
       button.addEventListener("click", () => this.navigate(button.dataset.route));
+    });
+
+    this.shadowRoot.querySelector("[data-toggle-menu]")?.addEventListener("click", () => {
+      this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
     });
 
     this.shadowRoot.querySelector("[data-refresh]")?.addEventListener("click", () => {
