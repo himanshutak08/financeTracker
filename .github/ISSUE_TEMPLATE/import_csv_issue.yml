@@ -7,7 +7,7 @@ body:
     id: version
     attributes:
       label: Finance Tracker version
-      placeholder: "0.2.11"
+      placeholder: "0.3.0"
     validations:
       required: true
   - type: dropdown
