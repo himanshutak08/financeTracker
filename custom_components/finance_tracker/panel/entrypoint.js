@@ -1086,9 +1086,16 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .hero {
+          background:
+            radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--primary-color) 22%, transparent), transparent 34%),
+            linear-gradient(135deg, color-mix(in srgb, var(--card-background-color, #fff) 94%, var(--primary-color)), var(--card-background-color, #fff));
+          border: 1px solid color-mix(in srgb, var(--divider-color) 78%, var(--primary-color));
+          border-radius: 20px;
           display: grid;
           gap: 10px;
           margin-bottom: 16px;
+          overflow: hidden;
+          padding: clamp(18px, 3vw, 30px);
         }
 
         .eyebrow {
@@ -1133,7 +1140,10 @@ class FinanceTrackerPanel extends HTMLElement {
           font: inherit;
           padding: 9px 14px;
           white-space: nowrap;
+          transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
         }
+
+        .tab:hover:not([disabled]) { transform: translateY(-1px); }
 
         .tab.active {
           background: var(--primary-color, #03a9f4);
@@ -1145,7 +1155,7 @@ class FinanceTrackerPanel extends HTMLElement {
           background: var(--card-background-color, #fff);
           border: 1px solid var(--divider-color, #e1e4e8);
           border-radius: 16px;
-          box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+          box-shadow: 0 14px 34px rgba(0, 0, 0, 0.10);
           overflow: hidden;
           padding: clamp(16px, 2.5vw, 28px);
         }
@@ -1159,7 +1169,9 @@ class FinanceTrackerPanel extends HTMLElement {
 
         .metric {
           background: var(--secondary-background-color, #f6f7f8);
+          border: 1px solid var(--divider-color, #e1e4e8);
           border-radius: 18px;
+          box-shadow: inset 0 3px 0 color-mix(in srgb, var(--primary-color) 70%, transparent);
           padding: 16px;
         }
 
@@ -1406,6 +1418,7 @@ class FinanceTrackerPanel extends HTMLElement {
           cursor: pointer;
           font: inherit;
           padding: 9px 13px;
+          transition: filter 160ms ease, transform 160ms ease, opacity 160ms ease;
         }
 
         .primary-button {
@@ -1415,6 +1428,7 @@ class FinanceTrackerPanel extends HTMLElement {
 
         .secondary-button {
           background: var(--secondary-background-color, #eef1f4);
+          border: 1px solid var(--divider-color, #d8dde3);
           color: inherit;
         }
 
@@ -1424,9 +1438,26 @@ class FinanceTrackerPanel extends HTMLElement {
           color: var(--error-color, #b91c1c);
         }
 
+        button:hover:not([disabled]) {
+          filter: brightness(1.06);
+          transform: translateY(-1px);
+        }
+
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible,
+        summary:focus-visible {
+          outline: 2px solid var(--primary-color);
+          outline-offset: 2px;
+        }
+
         button[disabled] {
-          cursor: progress;
-          opacity: 0.6;
+          background: color-mix(in srgb, var(--secondary-background-color, #eef1f4) 86%, transparent);
+          border: 1px solid var(--divider-color, #d8dde3);
+          color: var(--disabled-text-color, var(--secondary-text-color));
+          cursor: not-allowed;
+          opacity: 0.72;
         }
 
         button {
@@ -1445,6 +1476,17 @@ class FinanceTrackerPanel extends HTMLElement {
           display: grid;
           gap: 10px;
           padding: 14px;
+          transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+        }
+
+        .expense-card:hover {
+          border-color: color-mix(in srgb, var(--divider-color) 45%, var(--primary-color));
+          transform: translateY(-1px);
+        }
+
+        .expense-card.selected {
+          border-color: var(--primary-color);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 20%, transparent);
         }
 
         .expense-card.archived {
@@ -1502,8 +1544,31 @@ class FinanceTrackerPanel extends HTMLElement {
           flex-wrap: wrap;
           gap: 12px;
           justify-content: space-between;
+          cursor: pointer;
+          list-style: none;
+        }
+
+        .month-heading::-webkit-details-marker { display: none; }
+
+        .month-heading::after {
+          align-items: center;
+          background: var(--card-background-color, #fff);
+          border: 1px solid var(--divider-color);
+          border-radius: 50%;
+          content: "+";
+          display: inline-flex;
+          font-size: 18px;
+          height: 30px;
+          justify-content: center;
+          margin-left: auto;
+          width: 30px;
+        }
+
+        .month-group[open] > .month-heading {
           margin-bottom: 12px;
         }
+
+        .month-group[open] > .month-heading::after { content: "−"; }
 
         .month-heading strong {
           font-size: 18px;
@@ -1671,6 +1736,7 @@ class FinanceTrackerPanel extends HTMLElement {
           .hero {
             gap: 6px;
             margin: 14px 0 10px;
+            padding: 14px;
           }
           h1 { font-size: 24px; }
           .subtitle { font-size: 14px; }
@@ -2222,7 +2288,7 @@ class FinanceTrackerPanel extends HTMLElement {
             </div>
           </div>`
         : `<div class="expense-list">${expenses.map((expense) => `
-            <div class="expense-card ${expense.is_active ? "" : "archived"}">
+            <div class="expense-card ${expense.is_active ? "" : "archived"} ${this._selectedExpenseIds.has(expense.template_id) ? "selected" : ""}">
               <div class="expense-card-top">
                 <div style="display:flex;gap:10px;align-items:flex-start">
                   <input type="checkbox" data-expense-select="${expense.template_id}" aria-label="Select ${this._escape(expense.name)}" ${this._selectedExpenseIds.has(expense.template_id) ? "checked" : ""} style="width:20px;height:20px;margin-top:2px">
@@ -2428,11 +2494,11 @@ class FinanceTrackerPanel extends HTMLElement {
             );
             const total = items.reduce((sum, item) => sum + item.scheduled_amount, 0);
             return `
-              <section class="month-group">
-                <div class="month-heading">
+              <details class="month-group" ${month === (this._planYear === currentYear ? new Date().getMonth() + 1 : 1) ? "open" : ""}>
+                <summary class="month-heading">
                   <strong>${this._escape(monthName)}</strong>
                   <span>${items.length} item${items.length === 1 ? "" : "s"} · ${this._escape(this.formatAmount(total))}</span>
-                </div>
+                </summary>
                 ${items.map((item) => `
                   <details class="plan-item">
                     <summary>
@@ -2460,7 +2526,7 @@ class FinanceTrackerPanel extends HTMLElement {
                     </form>
                   </details>
                 `).join("")}
-              </section>
+              </details>
             `;
           }).join("")}</div>`;
 

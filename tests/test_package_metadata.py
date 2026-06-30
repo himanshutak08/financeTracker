@@ -82,7 +82,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.3.4")
+        self.assertEqual(manifest["version"], "0.3.5")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -289,6 +289,16 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn("overflow-x: auto", panel_source)
         self.assertIn("grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr)", panel_source)
         self.assertIn("@media (max-width: 420px)", panel_source)
+
+    def test_visual_polish_and_collapsible_year_plan_are_present(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn("radial-gradient", panel_source)
+        self.assertIn("button:focus-visible", panel_source)
+        self.assertIn(".expense-card.selected", panel_source)
+        self.assertIn(".month-group[open]", panel_source)
+        self.assertIn('<details class="month-group"', panel_source)
+        self.assertIn('<summary class="month-heading">', panel_source)
 
     def test_status_and_archive_styles_use_high_contrast_tokens(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
