@@ -37,17 +37,17 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.2.7")
+        self.assertEqual(manifest["version"], "0.2.8")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
+        frontend_source = (INTEGRATION / "frontend.py").read_text()
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
 
         self.assertIn('PANEL_WEB_COMPONENT_NAME = "finance-tracker-panel"', constants)
-        self.assertIn(
-            'customElements.define("finance-tracker-panel", FinanceTrackerPanel)',
-            panel_source,
-        )
+        self.assertIn("panel_element_name = f\"{PANEL_WEB_COMPONENT_NAME}-{integration_version.replace('.', '-')}\"", frontend_source)
+        self.assertIn("FINANCE_TRACKER_PANEL_ELEMENT", panel_source)
+        self.assertIn("customElements.define(FINANCE_TRACKER_PANEL_ELEMENT, FinanceTrackerPanel)", panel_source)
 
     def test_panel_uses_host_theme_and_preserves_form_state(self) -> None:
         frontend_source = (INTEGRATION / "frontend.py").read_text()

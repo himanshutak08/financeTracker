@@ -60,6 +60,7 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
         f"/api/finance_tracker/panel/"
         f"{integration_version.replace('.', '_')}/{PANEL_ENTRYPOINT}"
     )
+    panel_element_name = f"{PANEL_WEB_COMPONENT_NAME}-{integration_version.replace('.', '-')}"
     domain_data = hass.data.setdefault(DOMAIN, {})
     loaded_asset_urls = domain_data.setdefault(PANEL_STATIC_LOADED_KEY, set())
     if not isinstance(loaded_asset_urls, set):
@@ -85,7 +86,7 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
         frontend_url_path=PANEL_FRONTEND_URL_PATH,
         config={
             "_panel_custom": {
-                "name": PANEL_WEB_COMPONENT_NAME,
+                "name": panel_element_name,
                 "embed_iframe": False,
                 "trust_external": False,
                 "js_url": f"{panel_asset_url}?v={integration_version}",

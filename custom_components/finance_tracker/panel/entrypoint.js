@@ -1,3 +1,17 @@
+const FINANCE_TRACKER_PANEL_VERSION = (() => {
+  const scriptUrl = document.currentScript?.src || "";
+  try {
+    return new URL(scriptUrl, window.location.href).searchParams.get("v") || "dev";
+  } catch (_err) {
+    return "dev";
+  }
+})();
+
+const FINANCE_TRACKER_PANEL_ELEMENT = `finance-tracker-panel-${FINANCE_TRACKER_PANEL_VERSION
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+|-+$/g, "") || "dev"}`;
+
 class FinanceTrackerPanel extends HTMLElement {
   constructor() {
     super();
@@ -1867,4 +1881,6 @@ class FinanceTrackerPanel extends HTMLElement {
   }
 }
 
-customElements.define("finance-tracker-panel", FinanceTrackerPanel);
+if (!customElements.get(FINANCE_TRACKER_PANEL_ELEMENT)) {
+  customElements.define(FINANCE_TRACKER_PANEL_ELEMENT, FinanceTrackerPanel);
+}

@@ -83,7 +83,7 @@ Database migrations run automatically during startup and preserve existing recor
 
 ## Releases
 
-HACS releases should use semantic version tags such as `v0.2.7`. The tag version must match `custom_components/finance_tracker/manifest.json`, and each GitHub release should summarize migrations and user-visible changes.
+HACS releases should use semantic version tags such as `v0.2.8`. The tag version must match `custom_components/finance_tracker/manifest.json`, and each GitHub release should summarize migrations and user-visible changes.
 
 ## Planned repository structure
 
