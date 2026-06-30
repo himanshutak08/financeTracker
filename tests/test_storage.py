@@ -219,6 +219,30 @@ class FinanceTrackerStorageTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(Exception, "Reactivate it instead"):
             await self._add_monthly_expense()
 
+    async def test_permanent_delete_only_removes_unused_archived_expenses(self) -> None:
+        unused = await self._add_monthly_expense()
+        await self.storage.async_archive_expense(unused["template_id"])
+
+        deleted = await self.storage.async_delete_expenses([unused["template_id"]])
+        self.assertEqual(deleted["deleted_count"], 1)
+        self.assertEqual((await self.storage.async_list_expenses())["count"], 0)
+
+        historical = await self._add_monthly_expense()
+        await self.storage.async_generate_year(2027)
+        await self.storage.async_archive_expense(historical["template_id"])
+        blocked = await self.storage.async_delete_expenses([historical["template_id"]])
+
+        self.assertEqual(blocked["deleted_count"], 0)
+        self.assertEqual(blocked["blocked"][0]["reason"], "has generated history")
+        self.assertEqual((await self.storage.async_list_expenses())["count"], 1)
+
+    async def test_permanent_delete_requires_archive_first(self) -> None:
+        active = await self._add_monthly_expense()
+        result = await self.storage.async_delete_expenses([active["template_id"]])
+
+        self.assertEqual(result["deleted_count"], 0)
+        self.assertEqual(result["blocked"][0]["reason"], "archive it first")
+
     async def test_year_plan_adjustment_updates_plan_and_month_ledger(self) -> None:
         await self._add_monthly_expense()
         await self.storage.async_generate_year(2027)
@@ -400,11 +424,16 @@ class FinanceTrackerStorageTests(unittest.IsolatedAsyncioTestCase):
                 "currency": "usd",
                 "reminders_enabled": True,
                 "notification_service": "notify.mobile_app_phone",
+                "mobile_notification_service": "notify.mobile_app_second_phone",
                 "scan_interval_minutes": 30,
             }
         )
         self.assertEqual(settings["currency"], "USD")
         self.assertEqual(settings["scan_interval_minutes"], 30)
+        self.assertEqual(
+            settings["mobile_notification_service"],
+            "notify.mobile_app_second_phone",
+        )
 
         await self._add_monthly_expense()
         await self.storage.async_generate_year(2027)

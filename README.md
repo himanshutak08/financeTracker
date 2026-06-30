@@ -21,7 +21,8 @@ The integration is designed for local-first personal finance tracking. Your data
 - History view with monthly, category, and payment breakdowns.
 - CSV exports for expenses, current month, and history.
 - Safe cleanup tools for rebuilding a generated year or clearing reminder delivery history.
-- Configurable reminder notifications through Home Assistant notify services.
+- Configurable in-app and Companion App phone notifications, with detected mobile services and test delivery.
+- Multi-select catalog actions for bulk safe-delete and guarded permanent deletion of unused archived definitions.
 - Local SQLite storage at `config/finance/tracker.db`.
 
 ## Compatibility
@@ -131,6 +132,15 @@ The Settings screen includes safe cleanup tools:
 - Reset all Finance Tracker data after typing a confirmation phrase.
 
 These actions require confirmation and do not delete expense definitions or remove the database.
+
+The Expense Catalog also supports multi-select maintenance:
+
+- **Bulk archive** safely deactivates selected definitions. Existing generated years and payment history remain intact, and future generated years skip them.
+- **Bulk permanent delete** removes only archived definitions that have never been used in a generated plan. Definitions referenced by history are kept automatically.
+
+## Phone notifications
+
+Install and sign in to the Home Assistant Companion App, then open **Finance → Settings**. Choose the detected `notify.mobile_app_…` service under **Phone notification service**, save, and use **Send test to phone**. Finance Tracker continues creating the configured Home Assistant notification and also sends eligible reminders to the selected phone.
 
 ## Removing
 

@@ -13,6 +13,7 @@ from .const import (
     SERVICE_ACTIVATE_YEAR,
     SERVICE_ADD_EXPENSE,
     SERVICE_ARCHIVE_EXPENSE,
+    SERVICE_DELETE_EXPENSES,
     SERVICE_COPY_YEAR,
     SERVICE_GENERATE_YEAR,
     SERVICE_GET_CURRENT_MONTH,
@@ -63,6 +64,7 @@ IMPORT_EXPENSES_FILE_SCHEMA = vol.Schema(
 )
 
 ARCHIVE_EXPENSE_SCHEMA = vol.Schema({vol.Required("template_id"): str})
+DELETE_EXPENSES_SCHEMA = vol.Schema({vol.Required("template_ids"): [str]})
 
 COPY_YEAR_SCHEMA = vol.Schema(
     {
@@ -134,6 +136,7 @@ UPDATE_SETTINGS_SCHEMA = vol.Schema(
         vol.Optional("currency"): str,
         vol.Optional("reminders_enabled"): bool,
         vol.Optional("notification_service"): str,
+        vol.Optional("mobile_notification_service"): str,
         vol.Optional("scan_interval_minutes"): vol.All(
             vol.Coerce(int), vol.Range(min=5, max=1440)
         ),
@@ -197,6 +200,13 @@ class FinanceTrackerServiceManager:
             SERVICE_ARCHIVE_EXPENSE,
             self._handle_archive_expense,
             schema=ARCHIVE_EXPENSE_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+        self._hass.services.async_register(
+            DOMAIN,
+            SERVICE_DELETE_EXPENSES,
+            self._handle_delete_expenses,
+            schema=DELETE_EXPENSES_SCHEMA,
             supports_response=SupportsResponse.OPTIONAL,
         )
         self._hass.services.async_register(
@@ -318,6 +328,7 @@ class FinanceTrackerServiceManager:
             SERVICE_ADD_EXPENSE,
             SERVICE_IMPORT_EXPENSES_FILE,
             SERVICE_ARCHIVE_EXPENSE,
+            SERVICE_DELETE_EXPENSES,
             SERVICE_COPY_YEAR,
             SERVICE_UPDATE_EXPENSE,
             SERVICE_GENERATE_YEAR,
@@ -355,6 +366,9 @@ class FinanceTrackerServiceManager:
 
     async def _handle_archive_expense(self, call: ServiceCall) -> dict[str, Any]:
         return await self._storage.async_archive_expense(call.data["template_id"])
+
+    async def _handle_delete_expenses(self, call: ServiceCall) -> dict[str, Any]:
+        return await self._storage.async_delete_expenses(call.data["template_ids"])
 
     async def _handle_copy_year(self, call: ServiceCall) -> dict[str, Any]:
         return await self._storage.async_copy_year(

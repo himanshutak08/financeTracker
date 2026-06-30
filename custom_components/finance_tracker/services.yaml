@@ -73,6 +73,14 @@ archive_expense:
       required: true
       selector:
         text:
+delete_expenses:
+  name: Delete unused archived expenses
+  description: Permanently delete archived expense definitions that have no generated history.
+  fields:
+    template_ids:
+      required: true
+      selector:
+        object:
 copy_year:
   name: Copy year
   description: Copy an existing year plan into a draft target year for review.

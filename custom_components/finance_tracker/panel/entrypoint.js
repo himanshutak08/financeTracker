@@ -31,6 +31,8 @@ class FinanceTrackerPanel extends HTMLElement {
     this._expenseBusy = false;
     this._editingExpenseId = null;
     this._expenseDraft = null;
+    this._selectedExpenseIds = new Set();
+    this._expenseBulkResult = "";
     this._planYear = new Date().getFullYear();
     this._yearPlan = null;
     this._yearLoading = false;
@@ -387,6 +389,57 @@ class FinanceTrackerPanel extends HTMLElement {
     }
   }
 
+  async bulkArchiveExpenses() {
+    const ids = [...this._selectedExpenseIds];
+    const activeIds = ids.filter((id) =>
+      this._expenses?.expenses?.find((expense) => expense.template_id === id)?.is_active
+    );
+    if (!activeIds.length || !window.confirm(`Safe delete ${activeIds.length} selected active expense(s)? Past history will remain available.`)) {
+      return;
+    }
+    this._expenseBusy = true;
+    this._expenseError = "";
+    this.render();
+    try {
+      for (const templateId of activeIds) {
+        await this._hass.callService("finance_tracker", "archive_expense", { template_id: templateId });
+      }
+      this._expenseBulkResult = `${activeIds.length} expense(s) archived. Historical entries were preserved.`;
+      this._selectedExpenseIds.clear();
+      await this.loadExpenses();
+    } catch (err) {
+      this._expenseError = err?.message || String(err);
+    } finally {
+      this._expenseBusy = false;
+      this.render();
+    }
+  }
+
+  async bulkDeleteExpenses() {
+    const ids = [...this._selectedExpenseIds];
+    if (!ids.length || !window.confirm(`Permanently delete ${ids.length} selected definition(s)? Only archived expenses with no generated history can be deleted.`)) {
+      return;
+    }
+    this._expenseBusy = true;
+    this._expenseError = "";
+    this.render();
+    try {
+      const result = await this._hass.callService(
+        "finance_tracker", "delete_expenses", { template_ids: ids }, {}, true
+      );
+      const response = result?.response || result || {};
+      const blocked = response.blocked || [];
+      this._expenseBulkResult = `${response.deleted_count || 0} permanently deleted.${blocked.length ? ` ${blocked.length} kept because they are active or have history.` : ""}`;
+      this._selectedExpenseIds.clear();
+      await this.loadExpenses();
+    } catch (err) {
+      this._expenseError = err?.message || String(err);
+    } finally {
+      this._expenseBusy = false;
+      this.render();
+    }
+  }
+
   async loadYearPlan(year = this._planYear) {
     if (!this._hass) {
       return;
@@ -504,9 +557,35 @@ class FinanceTrackerPanel extends HTMLElement {
         currency: String(data.get("currency") || "").trim().toUpperCase(),
         reminders_enabled: data.get("reminders_enabled") === "on",
         notification_service: String(data.get("notification_service") || "").trim(),
+        mobile_notification_service: String(data.get("mobile_notification_service") || "").trim(),
         scan_interval_minutes: Number(data.get("scan_interval_minutes")),
       });
       await this.loadSettings();
+    } catch (err) {
+      this._settingsError = err?.message || String(err);
+    } finally {
+      this._settingsBusy = false;
+      this.render();
+    }
+  }
+
+  async sendTestNotification(servicePath) {
+    const target = String(servicePath || "").trim();
+    if (!target || !target.includes(".")) {
+      this._settingsError = "Choose a valid notify service first.";
+      this.render();
+      return;
+    }
+    this._settingsBusy = true;
+    this._settingsError = "";
+    this.render();
+    try {
+      const [domain, service] = target.split(".", 2);
+      await this._hass.callService(domain, service, {
+        title: "Finance Tracker",
+        message: "Phone notifications are configured correctly.",
+      });
+      this._reminderRunResult = { sent: 1, failed: 0, candidates: "test" };
     } catch (err) {
       this._settingsError = err?.message || String(err);
     } finally {
@@ -1163,10 +1242,21 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .entry-tools summary {
-          color: var(--primary-color);
+          background: var(--secondary-background-color, #eef1f4);
+          border-radius: 999px;
+          color: var(--primary-text-color);
           cursor: pointer;
+          display: inline-flex;
           font-size: 14px;
           font-weight: 600;
+          min-height: 44px;
+          align-items: center;
+          padding: 0 13px;
+          list-style: none;
+        }
+
+        .entry-tools summary::-webkit-details-marker {
+          display: none;
         }
 
         .detail-form {
@@ -1739,7 +1829,39 @@ class FinanceTrackerPanel extends HTMLElement {
         this._expenseDraft = null;
         this._expenseError = "";
         this.render();
+        requestAnimationFrame(() => {
+          const form = this.shadowRoot.querySelector("[data-expense-editor]");
+          form?.scrollIntoView({ behavior: "smooth", block: "start" });
+          this.shadowRoot.querySelector("#expense-name")?.focus({ preventScroll: true });
+        });
       });
+    });
+
+    this.shadowRoot.querySelectorAll("[data-expense-select]").forEach((input) => {
+      input.addEventListener("change", () => {
+        if (input.checked) {
+          this._selectedExpenseIds.add(input.dataset.expenseSelect);
+        } else {
+          this._selectedExpenseIds.delete(input.dataset.expenseSelect);
+        }
+        this.render();
+      });
+    });
+
+    this.shadowRoot.querySelector("[data-expense-select-all]")?.addEventListener("change", (event) => {
+      this._selectedExpenseIds.clear();
+      if (event.currentTarget.checked) {
+        (this._expenses?.expenses || []).forEach((expense) => this._selectedExpenseIds.add(expense.template_id));
+      }
+      this.render();
+    });
+
+    this.shadowRoot.querySelector("[data-expense-bulk-archive]")?.addEventListener("click", () => {
+      this.bulkArchiveExpenses();
+    });
+
+    this.shadowRoot.querySelector("[data-expense-bulk-delete]")?.addEventListener("click", () => {
+      this.bulkDeleteExpenses();
     });
 
     this.shadowRoot.querySelectorAll("[data-expense-archive]").forEach((button) => {
@@ -1803,6 +1925,11 @@ class FinanceTrackerPanel extends HTMLElement {
 
     this.shadowRoot.querySelector("[data-run-reminders]")?.addEventListener("click", () => {
       this.runRemindersNow();
+    });
+
+    this.shadowRoot.querySelector("[data-test-mobile-notification]")?.addEventListener("click", () => {
+      const service = this.shadowRoot.querySelector("[name='mobile_notification_service']")?.value;
+      this.sendTestNotification(service);
     });
 
     this.shadowRoot.querySelector("[data-delete-year-form]")?.addEventListener("submit", (event) => {
@@ -2063,6 +2190,8 @@ class FinanceTrackerPanel extends HTMLElement {
 
   renderExpenseManagement() {
     const expenses = this._expenses?.expenses || [];
+    const selectedCount = this._selectedExpenseIds.size;
+    const allSelected = expenses.length > 0 && selectedCount === expenses.length;
     const editing = expenses.find(
       (expense) => expense.template_id === this._editingExpenseId
     );
@@ -2095,13 +2224,16 @@ class FinanceTrackerPanel extends HTMLElement {
         : `<div class="expense-list">${expenses.map((expense) => `
             <div class="expense-card ${expense.is_active ? "" : "archived"}">
               <div class="expense-card-top">
-                <div>
+                <div style="display:flex;gap:10px;align-items:flex-start">
+                  <input type="checkbox" data-expense-select="${expense.template_id}" aria-label="Select ${this._escape(expense.name)}" ${this._selectedExpenseIds.has(expense.template_id) ? "checked" : ""} style="width:20px;height:20px;margin-top:2px">
+                  <div>
                   <div class="name">${this._escape(expense.name)}</div>
                   <div class="meta">
                     <span>${this._escape(expense.category)}</span>
                     <span>${this._escape(expense.recurrence.replaceAll("_", " "))}</span>
                     <span>Due day ${this._escape(expense.due_day || "—")}</span>
                     ${expense.is_active ? "" : '<span class="badge archived">Archived</span>'}
+                  </div>
                   </div>
                 </div>
                 <div class="expense-amount">${this._escape(this.formatAmount(expense.default_amount))}</div>
@@ -2130,8 +2262,19 @@ class FinanceTrackerPanel extends HTMLElement {
         </div>
       </div>
       ${this._expenseError ? `<div class="error">${this._escape(this._expenseError)}</div><br>` : ""}
+      ${this._expenseBulkResult ? `<div class="empty">${this._escape(this._expenseBulkResult)}</div><br>` : ""}
+      ${expenses.length ? `<div class="toolbar report-card">
+        <label style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" data-expense-select-all ${allSelected ? "checked" : ""} style="width:20px;height:20px">
+          Select all (${selectedCount} selected)
+        </label>
+        <div class="form-actions">
+          <button class="secondary-button" type="button" data-expense-bulk-archive ${!selectedCount || this._expenseBusy ? "disabled" : ""}>Bulk archive</button>
+          <button class="danger-button" type="button" data-expense-bulk-delete ${!selectedCount || this._expenseBusy ? "disabled" : ""}>Bulk permanent delete</button>
+        </div>
+      </div><br>` : ""}
       <div class="expense-layout">
-        <section>
+        <section data-expense-editor>
           <div class="eyebrow">${editing ? "Edit Expense" : "New Expense"}</div>
           <div class="section-title">${editing ? this._escape(editing.name) : "Add an obligation"}</div>
           <form class="expense-form" data-expense-form>
@@ -2546,8 +2689,15 @@ class FinanceTrackerPanel extends HTMLElement {
       currency: "INR",
       reminders_enabled: true,
       notification_service: "persistent_notification.create",
+      mobile_notification_service: "",
       scan_interval_minutes: 60,
     };
+    const mobileNotifyServices = Object.keys(this._hass?.services?.notify || {})
+      .filter((service) => service.startsWith("mobile_app_"))
+      .sort();
+    const mobileOptions = mobileNotifyServices.map((service) =>
+      `<option value="notify.${this._escape(service)}"></option>`
+    ).join("");
     const result = this._reminderRunResult;
     const cleanup = this._cleanupResult;
 
@@ -2574,8 +2724,14 @@ class FinanceTrackerPanel extends HTMLElement {
                 <input id="settings-interval" name="scan_interval_minutes" type="number" min="5" max="1440" required value="${this._escape(settings.scan_interval_minutes)}">
               </div>
               <div class="field full">
-                <label for="settings-service">Notification service</label>
+                <label for="settings-service">Home Assistant notification service</label>
                 <input id="settings-service" name="notification_service" required value="${this._escape(settings.notification_service)}" placeholder="notify.mobile_app_phone">
+              </div>
+              <div class="field full">
+                <label for="settings-mobile-service">Phone notification service (optional)</label>
+                <input id="settings-mobile-service" name="mobile_notification_service" list="mobile-notify-services" value="${this._escape(settings.mobile_notification_service || "")}" placeholder="Select or enter notify.mobile_app_your_phone">
+                <datalist id="mobile-notify-services">${mobileOptions}</datalist>
+                <span class="meta">${mobileNotifyServices.length ? `${mobileNotifyServices.length} Companion App device service(s) detected.` : "No mobile_app notify service detected. Open the Home Assistant Companion App once, then reload this page."}</span>
               </div>
               <div class="field full">
                 <label>
@@ -2586,6 +2742,7 @@ class FinanceTrackerPanel extends HTMLElement {
             </div>
             <div class="form-actions">
               <button class="primary-button" type="submit" ${this._settingsBusy ? "disabled" : ""}>${this._settingsBusy ? "Working..." : "Save settings"}</button>
+              <button class="secondary-button" type="button" data-test-mobile-notification ${this._settingsBusy ? "disabled" : ""}>Send test to phone</button>
             </div>
           </form>
         </section>
@@ -2593,7 +2750,7 @@ class FinanceTrackerPanel extends HTMLElement {
           <div class="eyebrow">Reminder Engine</div>
           <div class="section-title">Delivery behavior</div>
           <p class="meta">Each expense uses its reminder-days setting. Upcoming, due-today, and overdue reminders are sent at most once per entry per day.</p>
-          <p class="meta">Use <strong>persistent_notification.create</strong> for notifications inside Home Assistant, or a service such as <strong>notify.mobile_app_phone</strong> for a device.</p>
+          <p class="meta">The Home Assistant target creates an in-app notification. Add a detected <strong>notify.mobile_app_…</strong> target to send the same reminder to your phone as well.</p>
           <button class="secondary-button" type="button" data-run-reminders ${this._settingsBusy ? "disabled" : ""}>Run reminder scan now</button>
         </section>
         <section class="report-card">

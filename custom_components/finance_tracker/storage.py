@@ -144,6 +144,7 @@ DEFAULT_SETTINGS = {
     "currency": "INR",
     "reminders_enabled": True,
     "notification_service": "persistent_notification.create",
+    "mobile_notification_service": "",
     "scan_interval_minutes": 60,
 }
 
@@ -179,6 +180,12 @@ class FinanceTrackerStorage:
     async def async_archive_expense(self, template_id: str) -> dict[str, Any]:
         """Deactivate an expense template."""
         return await self.hass.async_add_executor_job(self._archive_expense, template_id)
+
+    async def async_delete_expenses(self, template_ids: Sequence[str]) -> dict[str, Any]:
+        """Permanently delete archived templates that have no generated history."""
+        return await self.hass.async_add_executor_job(
+            self._delete_expenses, list(template_ids)
+        )
 
     async def async_copy_year(
         self, source_year: int, target_year: int
@@ -521,6 +528,51 @@ class FinanceTrackerStorage:
             "recurrence": row["recurrence"],
             "is_active": False,
         }
+
+    def _delete_expenses(self, template_ids: list[str]) -> dict[str, Any]:
+        unique_ids = list(dict.fromkeys(template_ids))
+        if not unique_ids:
+            raise HomeAssistantError("Select at least one expense to delete")
+
+        deleted: list[str] = []
+        blocked: list[dict[str, str]] = []
+        with self._connect() as conn:
+            for template_id in unique_ids:
+                row = conn.execute(
+                    "SELECT name, is_active FROM expense_templates WHERE template_id = ?",
+                    (template_id,),
+                ).fetchone()
+                if row is None:
+                    blocked.append({"template_id": template_id, "reason": "not found"})
+                    continue
+                if bool(row["is_active"]):
+                    blocked.append({
+                        "template_id": template_id,
+                        "name": row["name"],
+                        "reason": "archive it first",
+                    })
+                    continue
+                history_count = conn.execute(
+                    "SELECT COUNT(*) AS count FROM year_plan_items WHERE template_id = ?",
+                    (template_id,),
+                ).fetchone()["count"]
+                if history_count:
+                    blocked.append({
+                        "template_id": template_id,
+                        "name": row["name"],
+                        "reason": "has generated history",
+                    })
+                    continue
+                conn.execute(
+                    "DELETE FROM expense_templates WHERE template_id = ?",
+                    (template_id,),
+                )
+                self._insert_audit_event(
+                    conn, "expense_template", template_id, "expense_deleted", {"name": row["name"]}
+                )
+                deleted.append(template_id)
+
+        return {"deleted": deleted, "deleted_count": len(deleted), "blocked": blocked}
 
     def _copy_year(self, source_year: int, target_year: int) -> dict[str, Any]:
         if source_year == target_year:
@@ -1573,6 +1625,15 @@ class FinanceTrackerStorage:
                     "notification_service must use domain.service format"
                 )
             normalized["notification_service"] = notification_service
+        if "mobile_notification_service" in changes:
+            mobile_service = str(changes["mobile_notification_service"]).strip()
+            if mobile_service:
+                parts = mobile_service.split(".")
+                if len(parts) != 2 or parts[0] != "notify" or not parts[1]:
+                    raise HomeAssistantError(
+                        "mobile_notification_service must use notify.service format"
+                    )
+            normalized["mobile_notification_service"] = mobile_service
         if "scan_interval_minutes" in changes:
             interval = int(changes["scan_interval_minutes"])
             if interval < 5 or interval > 1440:

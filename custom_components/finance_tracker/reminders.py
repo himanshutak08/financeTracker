@@ -45,26 +45,36 @@ class FinanceTrackerReminderManager:
             return {"enabled": False, "candidates": 0, "sent": 0, "failed": 0}
 
         candidates = await self._storage.async_get_reminder_candidates()
-        service_path = settings["notification_service"]
-        domain, service = service_path.split(".", 1)
+        service_paths = [settings["notification_service"]]
+        mobile_service = settings.get("mobile_notification_service", "")
+        if mobile_service and mobile_service not in service_paths:
+            service_paths.append(mobile_service)
         sent = 0
         failed = 0
         for candidate in candidates:
             message = self._message(candidate, settings["currency"])
             payload = {"title": "Finance Tracker", "message": message}
-            try:
-                await self._hass.services.async_call(
-                    domain, service, payload, blocking=True
-                )
-            except Exception:
+            delivered = []
+            for service_path in service_paths:
+                domain, service = service_path.split(".", 1)
+                try:
+                    await self._hass.services.async_call(
+                        domain, service, payload, blocking=True
+                    )
+                    delivered.append(service_path)
+                except Exception:
+                    LOGGER.exception(
+                        "Failed to send reminder for %s through %s",
+                        candidate["entry_id"], service_path,
+                    )
+            if not delivered:
                 failed += 1
-                LOGGER.exception("Failed to send reminder for %s", candidate["entry_id"])
                 continue
             await self._storage.async_log_notification(
                 candidate["entry_id"],
                 candidate["reminder_type"],
                 candidate["dedupe_key"],
-                service_path,
+                ",".join(delivered),
                 payload,
             )
             sent += 1

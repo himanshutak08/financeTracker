@@ -82,7 +82,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.3.3")
+        self.assertEqual(manifest["version"], "0.3.4")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -224,6 +224,31 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn("Archived expense", storage_source)
         self.assertIn("Reactivate it instead", storage_source)
 
+    def test_expense_catalog_exposes_bulk_actions_and_edit_focus(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+        services_source = (INTEGRATION / "services.py").read_text()
+        storage_source = (INTEGRATION / "storage.py").read_text()
+
+        self.assertIn("data-expense-select-all", panel_source)
+        self.assertIn("data-expense-bulk-archive", panel_source)
+        self.assertIn("data-expense-bulk-delete", panel_source)
+        self.assertIn("scrollIntoView", panel_source)
+        self.assertIn("data-expense-editor", panel_source)
+        self.assertIn("SERVICE_DELETE_EXPENSES", services_source)
+        self.assertIn("async_delete_expenses", storage_source)
+        self.assertIn("has generated history", storage_source)
+
+    def test_settings_exposes_companion_app_notifications(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+        reminder_source = (INTEGRATION / "reminders.py").read_text()
+        storage_source = (INTEGRATION / "storage.py").read_text()
+
+        self.assertIn("mobile_notification_service", panel_source)
+        self.assertIn("mobile_app_", panel_source)
+        self.assertIn("data-test-mobile-notification", panel_source)
+        self.assertIn("mobile_notification_service", reminder_source)
+        self.assertIn('"mobile_notification_service": ""', storage_source)
+
     def test_empty_states_offer_next_actions(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
 
@@ -245,6 +270,7 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn('class="secondary-button" data-expense-refresh', panel_source)
         self.assertIn('class="primary-button" data-year-activate', panel_source)
         self.assertIn("toolbar .form-actions", panel_source)
+        self.assertIn(".entry-tools summary::-webkit-details-marker", panel_source)
 
     def test_panel_has_no_stale_scaffold_copy(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
