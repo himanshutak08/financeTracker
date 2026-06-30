@@ -82,7 +82,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.3.5")
+        self.assertEqual(manifest["version"], "0.3.6")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -293,12 +293,15 @@ class PackageMetadataTests(unittest.TestCase):
     def test_visual_polish_and_collapsible_year_plan_are_present(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
 
-        self.assertIn("radial-gradient", panel_source)
+        self.assertIn("Track household expenses, dues, and payments in one place.", panel_source)
         self.assertIn("button:focus-visible", panel_source)
         self.assertIn(".expense-card.selected", panel_source)
         self.assertIn(".month-group[open]", panel_source)
         self.assertIn('<details class="month-group"', panel_source)
         self.assertIn('<summary class="month-heading">', panel_source)
+        self.assertIn('<summary class="partial-action" role="button">', panel_source)
+        self.assertIn('<summary class="edit-action" role="button">', panel_source)
+        self.assertNotIn("Plan, pay, and stay ahead.", panel_source)
 
     def test_status_and_archive_styles_use_high_contrast_tokens(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()

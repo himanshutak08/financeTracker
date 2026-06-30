@@ -1086,16 +1086,9 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .hero {
-          background:
-            radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--primary-color) 22%, transparent), transparent 34%),
-            linear-gradient(135deg, color-mix(in srgb, var(--card-background-color, #fff) 94%, var(--primary-color)), var(--card-background-color, #fff));
-          border: 1px solid color-mix(in srgb, var(--divider-color) 78%, var(--primary-color));
-          border-radius: 20px;
           display: grid;
-          gap: 10px;
-          margin-bottom: 16px;
-          overflow: hidden;
-          padding: clamp(18px, 3vw, 30px);
+          gap: 6px;
+          margin: 0 0 18px;
         }
 
         .eyebrow {
@@ -1108,16 +1101,16 @@ class FinanceTrackerPanel extends HTMLElement {
 
         h1 {
           margin: 0;
-          font-size: clamp(28px, 4vw, 44px);
-          letter-spacing: -0.025em;
-          line-height: 1.08;
+          font-size: clamp(26px, 3vw, 34px);
+          letter-spacing: -0.015em;
+          line-height: 1.15;
         }
 
         .subtitle {
           color: var(--secondary-text-color);
           font-size: 16px;
           line-height: 1.5;
-          max-width: 68ch;
+          max-width: 58ch;
         }
 
         .tabs {
@@ -1133,17 +1126,17 @@ class FinanceTrackerPanel extends HTMLElement {
         .tab {
           border: 1px solid var(--divider-color);
           background: var(--card-background-color, #fff);
-          border-radius: 10px;
+          border-radius: 8px;
           color: inherit;
           cursor: pointer;
           flex: 0 0 auto;
           font: inherit;
           padding: 9px 14px;
           white-space: nowrap;
-          transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+          transition: background-color 140ms ease, border-color 140ms ease;
         }
 
-        .tab:hover:not([disabled]) { transform: translateY(-1px); }
+        .tab:hover:not([disabled]) { border-color: var(--primary-color); }
 
         .tab.active {
           background: var(--primary-color, #03a9f4);
@@ -1154,8 +1147,8 @@ class FinanceTrackerPanel extends HTMLElement {
         .panel {
           background: var(--card-background-color, #fff);
           border: 1px solid var(--divider-color, #e1e4e8);
-          border-radius: 16px;
-          box-shadow: 0 14px 34px rgba(0, 0, 0, 0.10);
+          border-radius: 12px;
+          box-shadow: none;
           overflow: hidden;
           padding: clamp(16px, 2.5vw, 28px);
         }
@@ -1170,8 +1163,8 @@ class FinanceTrackerPanel extends HTMLElement {
         .metric {
           background: var(--secondary-background-color, #f6f7f8);
           border: 1px solid var(--divider-color, #e1e4e8);
-          border-radius: 18px;
-          box-shadow: inset 0 3px 0 color-mix(in srgb, var(--primary-color) 70%, transparent);
+          border-radius: 10px;
+          border-top: 3px solid var(--primary-color);
           padding: 16px;
         }
 
@@ -1199,7 +1192,7 @@ class FinanceTrackerPanel extends HTMLElement {
         .pay-button {
           background: var(--primary-color);
           border: 0;
-          border-radius: 999px;
+          border-radius: 8px;
           color: var(--text-primary-color, #fff);
           cursor: pointer;
           font: inherit;
@@ -1222,7 +1215,7 @@ class FinanceTrackerPanel extends HTMLElement {
         .entry {
           background: var(--secondary-background-color, #f6f7f8);
           border: 1px solid var(--divider-color, #e1e4e8);
-          border-radius: 18px;
+          border-radius: 12px;
           display: grid;
           gap: 12px;
           grid-template-columns: 1fr auto;
@@ -1245,7 +1238,7 @@ class FinanceTrackerPanel extends HTMLElement {
           align-items: center;
           display: flex;
           flex-wrap: wrap;
-          gap: 12px;
+          gap: 8px;
           margin-top: 12px;
         }
 
@@ -1254,17 +1247,45 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .entry-tools summary {
-          background: var(--secondary-background-color, #eef1f4);
-          border-radius: 999px;
+          align-items: center;
+          background: var(--card-background-color, #fff);
+          border: 1px solid var(--divider-color, #d8dde3);
+          border-radius: 8px;
           color: var(--primary-text-color);
           cursor: pointer;
-          display: inline-flex;
+          display: flex;
           font-size: 14px;
           font-weight: 600;
-          min-height: 44px;
-          align-items: center;
-          padding: 0 13px;
+          gap: 8px;
+          justify-content: center;
           list-style: none;
+          min-height: 42px;
+          padding: 8px 12px;
+          width: 100%;
+        }
+
+        .entry-tools summary::before {
+          align-items: center;
+          background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+          border-radius: 6px;
+          color: var(--primary-color);
+          content: "+";
+          display: inline-flex;
+          font-size: 17px;
+          font-weight: 700;
+          height: 24px;
+          justify-content: center;
+          width: 24px;
+        }
+
+        .entry-tools summary.edit-action::before {
+          content: "✎";
+          font-size: 15px;
+        }
+
+        .entry-tools details[open] > summary {
+          border-color: var(--primary-color);
+          color: var(--primary-color);
         }
 
         .entry-tools summary::-webkit-details-marker {
@@ -1273,7 +1294,7 @@ class FinanceTrackerPanel extends HTMLElement {
 
         .detail-form {
           background: var(--primary-background-color, #f4f6f8);
-          border-radius: 14px;
+          border-radius: 10px;
           margin-top: 10px;
           padding: 12px;
         }
@@ -1389,7 +1410,7 @@ class FinanceTrackerPanel extends HTMLElement {
         textarea {
           background: var(--card-background-color, #fff);
           border: 1px solid var(--divider-color);
-          border-radius: 12px;
+          border-radius: 8px;
           box-sizing: border-box;
           color: var(--primary-text-color);
           font: inherit;
@@ -1414,11 +1435,11 @@ class FinanceTrackerPanel extends HTMLElement {
         .secondary-button,
         .danger-button {
           border: 0;
-          border-radius: 999px;
+          border-radius: 8px;
           cursor: pointer;
           font: inherit;
           padding: 9px 13px;
-          transition: filter 160ms ease, transform 160ms ease, opacity 160ms ease;
+          transition: filter 140ms ease, opacity 140ms ease;
         }
 
         .primary-button {
@@ -1440,7 +1461,6 @@ class FinanceTrackerPanel extends HTMLElement {
 
         button:hover:not([disabled]) {
           filter: brightness(1.06);
-          transform: translateY(-1px);
         }
 
         button:focus-visible,
@@ -1472,16 +1492,15 @@ class FinanceTrackerPanel extends HTMLElement {
         .expense-card {
           background: var(--secondary-background-color, #f6f7f8);
           border: 1px solid var(--divider-color, #e1e4e8);
-          border-radius: 16px;
+          border-radius: 10px;
           display: grid;
           gap: 10px;
           padding: 14px;
-          transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+          transition: border-color 140ms ease, box-shadow 140ms ease;
         }
 
         .expense-card:hover {
           border-color: color-mix(in srgb, var(--divider-color) 45%, var(--primary-color));
-          transform: translateY(-1px);
         }
 
         .expense-card.selected {
@@ -1517,7 +1536,7 @@ class FinanceTrackerPanel extends HTMLElement {
         .month-group {
           background: var(--secondary-background-color, #f6f7f8);
           border: 1px solid var(--divider-color, #e1e4e8);
-          border-radius: 18px;
+          border-radius: 10px;
           padding: 16px;
         }
 
@@ -1610,7 +1629,7 @@ class FinanceTrackerPanel extends HTMLElement {
         .report-card {
           background: var(--secondary-background-color, #f6f7f8);
           border: 1px solid var(--divider-color, #e1e4e8);
-          border-radius: 18px;
+          border-radius: 10px;
           padding: 16px;
         }
 
@@ -1658,7 +1677,7 @@ class FinanceTrackerPanel extends HTMLElement {
         .import-zone {
           background: var(--secondary-background-color, #f6f7f8);
           border: 2px dashed rgba(148, 163, 184, 0.35);
-          border-radius: 20px;
+          border-radius: 12px;
           display: grid;
           gap: 16px;
           padding: 24px;
@@ -1721,7 +1740,7 @@ class FinanceTrackerPanel extends HTMLElement {
         .placeholder {
           background: var(--secondary-background-color, #f6f7f8);
           border: 1px dashed rgba(148, 163, 184, 0.32);
-          border-radius: 18px;
+          border-radius: 10px;
           color: var(--secondary-text-color);
           padding: 18px;
         }
@@ -1734,9 +1753,7 @@ class FinanceTrackerPanel extends HTMLElement {
             width: 100%;
           }
           .hero {
-            gap: 6px;
             margin: 14px 0 10px;
-            padding: 14px;
           }
           h1 { font-size: 24px; }
           .subtitle { font-size: 14px; }
@@ -1789,10 +1806,9 @@ class FinanceTrackerPanel extends HTMLElement {
         </div>
         <div class="shell">
           <div class="hero">
-            <div class="eyebrow">Finance Tracker</div>
-            <h1>Plan, pay, and stay ahead.</h1>
+            <h1>Finance Tracker</h1>
             <div class="subtitle">
-              Manage recurring expenses, annual plans, payments, history, and reminders without leaving Home Assistant.
+              Track household expenses, dues, and payments in one place.
             </div>
           </div>
           <div class="tabs">
@@ -2155,7 +2171,7 @@ class FinanceTrackerPanel extends HTMLElement {
                 }
                 ${entry.remaining_amount > 0 ? `
                   <details>
-                    <summary>Record partial payment</summary>
+                    <summary class="partial-action" role="button">Record partial payment</summary>
                     <form class="inline-form detail-form" data-partial-payment-form>
                       <input type="hidden" name="entry_id" value="${this._escape(entry.entry_id)}">
                       <div class="field">
@@ -2175,7 +2191,7 @@ class FinanceTrackerPanel extends HTMLElement {
                   </details>
                 ` : ""}
                 <details>
-                  <summary>Edit this month</summary>
+                  <summary class="edit-action" role="button">Edit this month</summary>
                   <form class="form-grid detail-form" data-current-entry-form>
                     <input type="hidden" name="entry_id" value="${this._escape(entry.entry_id)}">
                     <div class="field">
