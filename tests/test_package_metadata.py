@@ -82,7 +82,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.3.6")
+        self.assertEqual(manifest["version"], "0.3.7")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -248,6 +248,18 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn("data-test-mobile-notification", panel_source)
         self.assertIn("mobile_notification_service", reminder_source)
         self.assertIn('"mobile_notification_service": ""', storage_source)
+
+    def test_settings_has_currency_chooser_and_accessible_statuses(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn("₹ Indian Rupee (INR)", panel_source)
+        self.assertIn("€ Euro (EUR)", panel_source)
+        self.assertIn('<select id="settings-currency"', panel_source)
+        self.assertNotIn('<input id="settings-currency"', panel_source)
+        self.assertIn('aria-label="Finance sections"', panel_source)
+        self.assertIn('aria-current="page"', panel_source)
+        self.assertIn('role="alert"', panel_source)
+        self.assertIn('aria-live="polite"', panel_source)
 
     def test_empty_states_offer_next_actions(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()

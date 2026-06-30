@@ -1811,18 +1811,18 @@ class FinanceTrackerPanel extends HTMLElement {
               Track household expenses, dues, and payments in one place.
             </div>
           </div>
-          <div class="tabs">
+          <nav class="tabs" aria-label="Finance sections">
             ${tabs
               .map(
                 ([key, label]) => `
-                  <button class="tab ${route === key ? "active" : ""}" data-route="${key}">
+                  <button class="tab ${route === key ? "active" : ""}" data-route="${key}" ${route === key ? 'aria-current="page"' : ""}>
                     ${label}
                   </button>
                 `
               )
               .join("")}
-          </div>
-          <div class="panel">${currentBody}</div>
+          </nav>
+          <main class="panel" id="finance-content" tabindex="-1">${currentBody}</main>
         </div>
       </div>
     `;
@@ -2092,11 +2092,11 @@ class FinanceTrackerPanel extends HTMLElement {
     `;
 
     if (this._loading) {
-      return `${filters}<br><div class="placeholder">Loading current month ledger...</div>`;
+      return `${filters}<br><div class="placeholder" role="status" aria-live="polite">Loading current month ledger...</div>`;
     }
 
     if (this._error) {
-      return `${filters}<br><div class="error">${this._escape(this._error)}</div>`;
+      return `${filters}<br><div class="error" role="alert">${this._escape(this._error)}</div>`;
     }
 
     const data = this._data;
@@ -2343,8 +2343,8 @@ class FinanceTrackerPanel extends HTMLElement {
           <button class="secondary-button" data-export-expenses ${expenses.length === 0 ? "disabled" : ""}>Export CSV</button>
         </div>
       </div>
-      ${this._expenseError ? `<div class="error">${this._escape(this._expenseError)}</div><br>` : ""}
-      ${this._expenseBulkResult ? `<div class="empty">${this._escape(this._expenseBulkResult)}</div><br>` : ""}
+      ${this._expenseError ? `<div class="error" role="alert">${this._escape(this._expenseError)}</div><br>` : ""}
+      ${this._expenseBulkResult ? `<div class="empty" role="status" aria-live="polite">${this._escape(this._expenseBulkResult)}</div><br>` : ""}
       ${expenses.length ? `<div class="toolbar report-card">
         <label style="display:flex;align-items:center;gap:8px">
           <input type="checkbox" data-expense-select-all ${allSelected ? "checked" : ""} style="width:20px;height:20px">
@@ -2433,7 +2433,7 @@ class FinanceTrackerPanel extends HTMLElement {
         </div>
         <button class="secondary-button" type="button" data-download-sample>Download sample CSV</button>
       </div>
-      ${this._importError ? `<div class="error">${this._escape(this._importError)}</div><br>` : ""}
+      ${this._importError ? `<div class="error" role="alert">${this._escape(this._importError)}</div><br>` : ""}
       ${response ? `
         <div class="empty">
           <strong>${this._escape(response.imported_count || 0)} expenses imported from ${this._escape(response.filename || "file")}.</strong>
@@ -2494,7 +2494,7 @@ class FinanceTrackerPanel extends HTMLElement {
     }
 
     const planBody = this._yearLoading
-      ? `<div class="placeholder">Loading ${this._planYear} plan...</div>`
+      ? `<div class="placeholder" role="status" aria-live="polite">Loading ${this._planYear} plan...</div>`
       : !plan
         ? `<div class="empty">
             <strong>No plan is loaded for ${this._planYear}.</strong>
@@ -2556,7 +2556,7 @@ class FinanceTrackerPanel extends HTMLElement {
         </div>
         ${isDraft ? `<button class="primary-button" data-year-activate ${disabled}>Activate year</button>` : ""}
       </div>
-      ${this._yearError ? `<div class="error">${this._escape(this._yearError)}</div><br>` : ""}
+      ${this._yearError ? `<div class="error" role="alert">${this._escape(this._yearError)}</div><br>` : ""}
       <div class="year-controls">
         <div class="control-card">
           <div class="eyebrow">Open Plan</div>
@@ -2594,7 +2594,7 @@ class FinanceTrackerPanel extends HTMLElement {
 
   renderHistory() {
     if (this._historyLoading) {
-      return `<div class="placeholder">Loading ${this._escape(this._historyYear)} history...</div>`;
+      return `<div class="placeholder" role="status" aria-live="polite">Loading ${this._escape(this._historyYear)} history...</div>`;
     }
 
     const history = this._history;
@@ -2623,7 +2623,7 @@ class FinanceTrackerPanel extends HTMLElement {
           <button class="secondary-button" data-export-history ${!history || history.entry_count === 0 ? "disabled" : ""}>Export CSV</button>
         </div>
       </div>
-      ${this._historyError ? `<div class="error">${this._escape(this._historyError)}</div><br>` : ""}
+      ${this._historyError ? `<div class="error" role="alert">${this._escape(this._historyError)}</div><br>` : ""}
       ${!history || history.entry_count === 0 ? `
         <div class="empty">
           <strong>No ledger history exists for ${this._escape(this._historyYear)}.</strong>
@@ -2765,7 +2765,7 @@ class FinanceTrackerPanel extends HTMLElement {
 
   renderSettings() {
     if (this._settingsLoading && !this._settings) {
-      return `<div class="placeholder">Loading settings...</div>`;
+      return `<div class="placeholder" role="status" aria-live="polite">Loading settings...</div>`;
     }
     const settings = this._settings || {
       currency: "INR",
@@ -2780,6 +2780,29 @@ class FinanceTrackerPanel extends HTMLElement {
     const mobileOptions = mobileNotifyServices.map((service) =>
       `<option value="notify.${this._escape(service)}"></option>`
     ).join("");
+    const currencies = [
+      ["INR", "₹ Indian Rupee (INR)"],
+      ["USD", "$ US Dollar (USD)"],
+      ["EUR", "€ Euro (EUR)"],
+      ["GBP", "£ British Pound (GBP)"],
+      ["AED", "د.إ UAE Dirham (AED)"],
+      ["AUD", "$ Australian Dollar (AUD)"],
+      ["CAD", "$ Canadian Dollar (CAD)"],
+      ["CHF", "CHF Swiss Franc (CHF)"],
+      ["CNY", "¥ Chinese Yuan (CNY)"],
+      ["HKD", "$ Hong Kong Dollar (HKD)"],
+      ["JPY", "¥ Japanese Yen (JPY)"],
+      ["NZD", "$ New Zealand Dollar (NZD)"],
+      ["SAR", "﷼ Saudi Riyal (SAR)"],
+      ["SGD", "$ Singapore Dollar (SGD)"],
+      ["ZAR", "R South African Rand (ZAR)"],
+    ];
+    if (!currencies.some(([code]) => code === settings.currency)) {
+      currencies.push([settings.currency, `${settings.currency} (current)`]);
+    }
+    const currencyOptions = currencies.map(([code, label]) =>
+      `<option value="${this._escape(code)}" ${settings.currency === code ? "selected" : ""}>${this._escape(label)}</option>`
+    ).join("");
     const result = this._reminderRunResult;
     const cleanup = this._cleanupResult;
 
@@ -2790,16 +2813,16 @@ class FinanceTrackerPanel extends HTMLElement {
           <div class="section-title">Notifications and defaults</div>
         </div>
       </div>
-      ${this._settingsError ? `<div class="error">${this._escape(this._settingsError)}</div><br>` : ""}
-      ${result ? `<div class="empty">Reminder scan complete: ${this._escape(result.sent ?? 0)} sent, ${this._escape(result.failed ?? 0)} failed, ${this._escape(result.candidates ?? 0)} eligible.</div><br>` : ""}
+      ${this._settingsError ? `<div class="error" role="alert">${this._escape(this._settingsError)}</div><br>` : ""}
+      ${result ? `<div class="empty" role="status" aria-live="polite">Reminder scan complete: ${this._escape(result.sent ?? 0)} sent, ${this._escape(result.failed ?? 0)} failed, ${this._escape(result.candidates ?? 0)} eligible.</div><br>` : ""}
       ${this.renderCleanupResult(cleanup)}
       <div class="expense-layout">
         <section>
           <form class="expense-form" data-settings-form>
             <div class="form-grid">
               <div class="field">
-                <label for="settings-currency">Currency code</label>
-                <input id="settings-currency" name="currency" minlength="3" maxlength="3" required value="${this._escape(settings.currency)}">
+                <label for="settings-currency">Display currency</label>
+                <select id="settings-currency" name="currency" required>${currencyOptions}</select>
               </div>
               <div class="field">
                 <label for="settings-interval">Scan interval (minutes)</label>
@@ -2816,8 +2839,8 @@ class FinanceTrackerPanel extends HTMLElement {
                 <span class="meta">${mobileNotifyServices.length ? `${mobileNotifyServices.length} Companion App device service(s) detected.` : "No mobile_app notify service detected. Open the Home Assistant Companion App once, then reload this page."}</span>
               </div>
               <div class="field full">
-                <label>
-                  <input name="reminders_enabled" type="checkbox" ${settings.reminders_enabled ? "checked" : ""} style="width:auto">
+                <label for="settings-reminders-enabled">
+                  <input id="settings-reminders-enabled" name="reminders_enabled" type="checkbox" ${settings.reminders_enabled ? "checked" : ""} style="width:auto">
                   Enable automatic reminders
                 </label>
               </div>
