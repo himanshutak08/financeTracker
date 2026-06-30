@@ -34,10 +34,53 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertTrue((brand / "icon.png").is_file())
         self.assertTrue((brand / "icon@2x.png").is_file())
 
+    def test_forum_screenshot_asset_plan_is_packaged(self) -> None:
+        asset_plan = ROOT / "forum-assets" / "screenshots.json"
+        data = json.loads(asset_plan.read_text())
+
+        self.assertTrue(asset_plan.is_file())
+        self.assertGreaterEqual(len(data["screenshots"]), 6)
+        self.assertEqual(data["gifs"][0]["id"], "first-use-flow")
+
+    def test_mobile_qa_checklist_is_packaged(self) -> None:
+        qa_plan = ROOT / "forum-assets" / "mobile-qa.json"
+        data = json.loads(qa_plan.read_text())
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertTrue(qa_plan.is_file())
+        self.assertIn("Hamburger menu opens", json.dumps(data))
+        self.assertIn("min-height: 44px", panel_source)
+
+    def test_github_issue_templates_are_packaged(self) -> None:
+        issue_dir = ROOT / ".github" / "ISSUE_TEMPLATE"
+
+        self.assertTrue((issue_dir / "bug_report.yml").is_file())
+        self.assertTrue((issue_dir / "feature_request.yml").is_file())
+        self.assertTrue((issue_dir / "import_csv_issue.yml").is_file())
+        self.assertIn("finance_tracker", (issue_dir / "bug_report.yml").read_text())
+
+    def test_readme_has_community_ready_sections(self) -> None:
+        readme = (ROOT / "README.md").read_text()
+
+        self.assertIn("HACS-Custom", readme)
+        self.assertIn("## Compatibility", readme)
+        self.assertIn("## Export and backup", readme)
+        self.assertIn("## Known limitations", readme)
+        self.assertIn("## Roadmap", readme)
+        self.assertIn("## Support and feedback", readme)
+
+    def test_community_forum_post_draft_is_packaged(self) -> None:
+        draft_path = ROOT / "forum-assets" / "community-post.json"
+        draft = json.loads(draft_path.read_text())
+
+        self.assertIn("Finance Tracker", draft["title"])
+        self.assertIn("Share your Projects", draft["category"])
+        self.assertIn("https://github.com/himanshutak08/financeTracker", draft["body"])
+
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.2.11")
+        self.assertEqual(manifest["version"], "0.3.0")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -89,6 +132,70 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn("Click Generate ${this._escape(this._planYear)}", panel_source)
         self.assertIn("Next: Generate ${this._escape(this._planYear)}", panel_source)
         self.assertIn("After importing expenses, generate this year", panel_source)
+
+    def test_current_month_empty_state_has_getting_started_checklist(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn("Getting started", panel_source)
+        self.assertIn("Current Month appears after you add expenses", panel_source)
+        self.assertIn('data-route="import">Bulk Import', panel_source)
+        self.assertIn('data-route="year-setup">Year Setup', panel_source)
+
+    def test_panel_exposes_csv_exports_for_expenses_current_and_history(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn("exportExpensesCsv()", panel_source)
+        self.assertIn("exportCurrentMonthCsv()", panel_source)
+        self.assertIn("exportHistoryCsv()", panel_source)
+        self.assertIn("downloadCsv(filename, columns, rows)", panel_source)
+        self.assertIn("data-export-expenses", panel_source)
+        self.assertIn("data-export-current", panel_source)
+        self.assertIn("data-export-history", panel_source)
+
+    def test_settings_exposes_safe_cleanup_tools(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+        websocket_source = (INTEGRATION / "websocket_api.py").read_text()
+        storage_source = (INTEGRATION / "storage.py").read_text()
+
+        self.assertIn("data-delete-year-form", panel_source)
+        self.assertIn("data-clear-reminder-log", panel_source)
+        self.assertIn('type: "finance_tracker/delete_year_plan"', panel_source)
+        self.assertIn('type: "finance_tracker/clear_reminder_log"', panel_source)
+        self.assertIn('"finance_tracker/delete_year_plan"', websocket_source)
+        self.assertIn('"finance_tracker/clear_reminder_log"', websocket_source)
+        self.assertIn("async_delete_year_plan", storage_source)
+        self.assertIn("async_clear_reminder_log", storage_source)
+
+    def test_panel_uses_settings_currency_for_display_amounts(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn("this.loadSettings(true)", panel_source)
+        self.assertIn("formatAmount(value)", panel_source)
+        self.assertIn("new Intl.NumberFormat", panel_source)
+        self.assertIn("this._settings?.currency", panel_source)
+        self.assertIn("this.formatAmount(summary.scheduled_total", panel_source)
+        self.assertIn("this.formatAmount(payment.amount)", panel_source)
+
+    def test_high_impact_actions_require_confirmation(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn("Mark ${entry.name} as paid", panel_source)
+        self.assertIn("Archive ${expense.name}", panel_source)
+        self.assertIn("Generate or rebuild the ${this._planYear} draft", panel_source)
+        self.assertIn("Activate the ${this._planYear} plan", panel_source)
+        self.assertIn("Copy ${sourceYear} into ${targetYear}", panel_source)
+        self.assertIn("Delete the ${planYear} Finance Tracker year plan", panel_source)
+
+    def test_empty_states_offer_next_actions(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+
+        self.assertIn("No expenses yet.", panel_source)
+        self.assertIn("No plan is loaded for ${this._planYear}.", panel_source)
+        self.assertIn("No ledger history exists", panel_source)
+        self.assertIn("No payments recorded for this year.", panel_source)
+        self.assertIn('data-route="year-setup">Open Year Setup', panel_source)
+        self.assertIn('data-route="current">Open Current Month', panel_source)
+        self.assertIn('querySelectorAll("[data-year-generate]")', panel_source)
 
     def test_panel_has_no_stale_scaffold_copy(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()

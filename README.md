@@ -1,5 +1,9 @@
 # Finance Tracker for Home Assistant
 
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-41BDF5.svg)](https://www.home-assistant.io/)
+[![Local First](https://img.shields.io/badge/Data-Local%20First-success.svg)](#data-and-privacy)
+
 Finance Tracker is a Home Assistant custom integration for managing household expenses inside Home Assistant. It adds a dedicated **Finance** sidebar panel where you can maintain recurring expenses, generate a yearly plan, track the current month, record payments, review history, and receive reminder notifications.
 
 The integration is designed for local-first personal finance tracking. Your data is stored in your Home Assistant config directory and is not sent to an external finance service.
@@ -14,8 +18,21 @@ The integration is designed for local-first personal finance tracking. Your data
 - Full and partial payment recording.
 - Month-specific edits for amount, due date, category, and notes.
 - History view with monthly, category, and payment breakdowns.
+- CSV exports for expenses, current month, and history.
+- Safe cleanup tools for rebuilding a generated year or clearing reminder delivery history.
 - Configurable reminder notifications through Home Assistant notify services.
 - Local SQLite storage at `config/finance/tracker.db`.
+
+## Compatibility
+
+- Distribution: HACS custom repository
+- Home Assistant minimum version: `2026.6.0`
+- Storage: local SQLite database
+- Panel access: Home Assistant admin users
+
+## Screenshots
+
+Screenshots are planned for the Home Assistant Community forum post. The capture checklist is stored in `forum-assets/screenshots.json`.
 
 ## Installation with HACS
 
@@ -93,6 +110,25 @@ Quarterly maintenance,Home,3000,custom_months,5,,,"1,4,7,10",mdi:tools,Quarterly
 
 Database migrations run automatically during startup. Do not replace `config/finance/tracker.db` with files from a release archive.
 
+## Export and backup
+
+Use the Finance panel export buttons to download CSV snapshots:
+
+- **Add Expense → Export CSV** for expense definitions.
+- **Current Month → Export CSV** for the visible monthly ledger.
+- **History → Export CSV** for yearly ledger and payment rows.
+
+These exports are meant for reporting and backup review. Keep backing up `config/finance/tracker.db` as the source of truth.
+
+## Maintenance tools
+
+The Settings screen includes safe cleanup tools:
+
+- Delete a generated year plan and its ledger rows.
+- Clear reminder delivery history so eligible reminders can be sent again.
+
+These actions require confirmation and do not delete expense definitions or remove the database.
+
 ## Removing
 
 1. Remove Finance Tracker from **Settings → Devices & services**.
@@ -119,6 +155,21 @@ Confirm that HACS is installing the latest release and that the repository is ad
 
 Check **Settings → System → Logs** and search for `finance_tracker`.
 
+## Known limitations
+
+- Finance Tracker is not a bank sync integration.
+- It does not connect to financial institutions or payment providers.
+- Export CSV files are snapshots, not a full database restore format.
+- Public testing is still early; keep regular Home Assistant backups.
+
+## Roadmap
+
+- Better dashboards and visual summaries.
+- Optional import/restore workflow for exported data.
+- More recurrence patterns.
+- Additional reminder options.
+- More polished mobile screenshots and forum examples.
+
 ## Data and privacy
 
 Finance data is stored locally in:
@@ -128,6 +179,17 @@ config/finance/tracker.db
 ```
 
 The integration does not require a cloud finance account and does not send expense data to an external service.
+
+## Support and feedback
+
+Before opening an issue:
+
+1. Update to the latest HACS release.
+2. Restart Home Assistant.
+3. Check logs for `finance_tracker`.
+4. If reporting import problems, remove sensitive data and include only minimal sample rows.
+
+Use the GitHub issue templates for bug reports, feature requests, and CSV/XLSX import issues.
 
 ## Development and validation
 

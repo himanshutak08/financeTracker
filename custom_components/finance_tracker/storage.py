@@ -204,6 +204,14 @@ class FinanceTrackerStorage:
         """Mark a year plan as active."""
         return await self.hass.async_add_executor_job(self._activate_year, plan_year)
 
+    async def async_delete_year_plan(self, plan_year: int) -> dict[str, Any]:
+        """Delete one generated year plan and its ledger rows."""
+        return await self.hass.async_add_executor_job(self._delete_year_plan, plan_year)
+
+    async def async_clear_reminder_log(self) -> dict[str, Any]:
+        """Clear reminder dedupe history without touching expenses or payments."""
+        return await self.hass.async_add_executor_job(self._clear_reminder_log)
+
     async def async_list_expenses(
         self, active_only: bool = False, category: str | None = None
     ) -> dict[str, Any]:
@@ -941,6 +949,81 @@ class FinanceTrackerStorage:
             "activated_at": now,
             "item_count": item_count,
         }
+
+    def _delete_year_plan(self, plan_year: int) -> dict[str, Any]:
+        if plan_year < 2000 or plan_year > 2100:
+            raise HomeAssistantError("year must be between 2000 and 2100")
+
+        with self._connect() as conn:
+            plan_row = conn.execute(
+                """
+                SELECT year_plan_id, status
+                FROM year_plans
+                WHERE plan_year = ?
+                """,
+                (plan_year,),
+            ).fetchone()
+            if plan_row is None:
+                raise HomeAssistantError(f"Unknown year: {plan_year}")
+
+            entry_count = conn.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM month_entries me
+                JOIN year_plan_items ypi ON ypi.plan_item_id = me.plan_item_id
+                WHERE ypi.year_plan_id = ?
+                """,
+                (plan_row["year_plan_id"],),
+            ).fetchone()["count"]
+            payment_count = conn.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM payments p
+                JOIN month_entries me ON me.entry_id = p.entry_id
+                JOIN year_plan_items ypi ON ypi.plan_item_id = me.plan_item_id
+                WHERE ypi.year_plan_id = ?
+                """,
+                (plan_row["year_plan_id"],),
+            ).fetchone()["count"]
+            self._insert_audit_event(
+                conn,
+                "year_plan",
+                plan_row["year_plan_id"],
+                "year_deleted",
+                {
+                    "year": plan_year,
+                    "previous_status": plan_row["status"],
+                    "deleted_entries": entry_count,
+                    "deleted_payments": payment_count,
+                },
+            )
+            conn.execute(
+                "DELETE FROM year_plans WHERE year_plan_id = ?",
+                (plan_row["year_plan_id"],),
+            )
+
+        return {
+            "year": plan_year,
+            "deleted_entries": entry_count,
+            "deleted_payments": payment_count,
+            "previous_status": plan_row["status"],
+        }
+
+    def _clear_reminder_log(self) -> dict[str, Any]:
+        with self._connect() as conn:
+            deleted = conn.execute(
+                "SELECT COUNT(*) AS count FROM notifications_log"
+            ).fetchone()["count"]
+            conn.execute("DELETE FROM notifications_log")
+            self._insert_audit_event(
+                conn,
+                "notifications_log",
+                "all",
+                "reminder_log_cleared",
+                {"deleted_notifications": deleted},
+            )
+
+        return {"deleted_notifications": deleted}
 
     def _list_expenses(
         self, active_only: bool, category: str | None

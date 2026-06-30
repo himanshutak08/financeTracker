@@ -206,6 +206,31 @@ class FinanceTrackerStorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ledger["entries"][0]["remaining_amount"], 132.75)
         self.assertEqual(ledger["entries"][0]["notes"], "Adjusted during year review")
 
+    async def test_cleanup_tools_delete_year_and_clear_reminder_log(self) -> None:
+        await self._add_monthly_expense()
+        await self.storage.async_generate_year(2027)
+        january = await self.storage.async_get_current_month(month_key="2027-01")
+        entry_id = january["entries"][0]["entry_id"]
+        await self.storage.async_mark_paid(entry_id, 100.0, "2027-01-10", None)
+        await self.storage.async_log_notification(
+            entry_id,
+            "due_today",
+            "due_today:2027-01-10:test",
+            "persistent_notification.create",
+            {"message": "test"},
+        )
+
+        cleared = await self.storage.async_clear_reminder_log()
+        deleted = await self.storage.async_delete_year_plan(2027)
+        current = await self.storage.async_get_current_month(month_key="2027-01")
+        catalog = await self.storage.async_list_expenses()
+
+        self.assertEqual(cleared["deleted_notifications"], 1)
+        self.assertEqual(deleted["deleted_entries"], 12)
+        self.assertEqual(deleted["deleted_payments"], 1)
+        self.assertEqual(current["entry_count"], 0)
+        self.assertEqual(catalog["count"], 1)
+
     async def test_current_month_filters_by_status_and_category(self) -> None:
         await self._add_monthly_expense()
         await self.storage.async_add_expense(

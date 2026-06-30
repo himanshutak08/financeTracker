@@ -15,6 +15,7 @@ from .storage import RECURRENCE_TYPES
 
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
 REQUIRED_COLUMNS = {"name", "category", "amount", "recurrence"}
+RECURRENCE_HELP = ", ".join(sorted(RECURRENCE_TYPES))
 
 
 def parse_expense_file(filename: str, encoded_content: str) -> list[dict]:
@@ -150,20 +151,30 @@ def _normalize_rows(rows: list[dict]) -> list[dict]:
         missing = [column for column in REQUIRED_COLUMNS if not row.get(column)]
         if missing:
             raise HomeAssistantError(
-                f"Row {row_number} is missing: {', '.join(sorted(missing))}"
+                f"Row {row_number}: missing required column value(s): {', '.join(sorted(missing))}. "
+                "Required columns are name, category, amount, and recurrence."
             )
 
         recurrence = row["recurrence"].lower().replace("-", "_").replace(" ", "_")
         if recurrence not in RECURRENCE_TYPES:
             raise HomeAssistantError(
-                f"Row {row_number} has unsupported recurrence: {row['recurrence']}"
+                _row_error(
+                    row_number,
+                    "recurrence",
+                    row["recurrence"],
+                    f"Use one of: {RECURRENCE_HELP}.",
+                )
             )
         try:
             amount = float(row["amount"])
         except ValueError as err:
-            raise HomeAssistantError(f"Row {row_number} has an invalid amount") from err
+            raise HomeAssistantError(
+                _row_error(row_number, "amount", row["amount"], "Enter a number such as 2500 or 2500.50.")
+            ) from err
         if amount < 0:
-            raise HomeAssistantError(f"Row {row_number} amount cannot be negative")
+            raise HomeAssistantError(
+                _row_error(row_number, "amount", row["amount"], "Amount cannot be negative.")
+            )
 
         expense = {
             "name": row["name"],
@@ -183,11 +194,11 @@ def _normalize_rows(rows: list[dict]) -> list[dict]:
                 number = int(float(row[field]))
             except ValueError as err:
                 raise HomeAssistantError(
-                    f"Row {row_number} has an invalid {field}"
+                    _row_error(row_number, field, row[field], f"Enter a whole number from {minimum} to {maximum}.")
                 ) from err
             if number < minimum or number > maximum:
                 raise HomeAssistantError(
-                    f"Row {row_number} {field} must be between {minimum} and {maximum}"
+                    _row_error(row_number, field, row[field], f"Value must be between {minimum} and {maximum}.")
                 )
             expense[field] = number
         for field in ("custom_months", "icon", "notes"):
@@ -204,18 +215,23 @@ def _normalize_rows(rows: list[dict]) -> list[dict]:
                 )
             except ValueError as err:
                 raise HomeAssistantError(
-                    f"Row {row_number} has invalid custom_months"
+                    _row_error(row_number, "custom_months", expense["custom_months"], "Use comma-separated month numbers such as 1,4,7,10.")
                 ) from err
             if not months or any(month < 1 or month > 12 for month in months):
                 raise HomeAssistantError(
-                    f"Row {row_number} custom_months must contain values from 1 to 12"
+                    _row_error(row_number, "custom_months", expense["custom_months"], "Use month numbers from 1 to 12.")
                 )
             expense["custom_months"] = ",".join(str(month) for month in months)
         if expense.get("start_month") and expense.get("end_month"):
             if expense["start_month"] > expense["end_month"]:
                 raise HomeAssistantError(
-                    f"Row {row_number} start_month cannot be after end_month"
+                    _row_error(row_number, "start_month", row["start_month"], "start_month cannot be after end_month.")
                 )
         normalized_rows.append(expense)
 
     return normalized_rows
+
+
+def _row_error(row_number: int, column: str, value: str, guidance: str) -> str:
+    safe_value = value if value else "<blank>"
+    return f"Row {row_number}, column '{column}', value '{safe_value}': {guidance}"

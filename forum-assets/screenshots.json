@@ -1,0 +1,76 @@
+{
+  "purpose": "Capture these assets before posting Finance Tracker to the Home Assistant Community forum.",
+  "capture_notes": [
+    "Install the latest HACS release and restart Home Assistant before capture.",
+    "Use both light and dark Home Assistant themes if possible.",
+    "Avoid showing real account numbers, addresses, or sensitive notes.",
+    "Use sample/demo expenses when sharing publicly."
+  ],
+  "screenshots": [
+    {
+      "id": "current-month-desktop",
+      "title": "Current Month ledger",
+      "route": "/finance/current",
+      "filename": "current-month-desktop.png",
+      "must_show": ["unpaid items above paid items", "summary totals", "mark paid action"]
+    },
+    {
+      "id": "add-expense-desktop",
+      "title": "Add Expense and catalog",
+      "route": "/finance/add",
+      "filename": "add-expense-desktop.png",
+      "must_show": ["expense form", "expense catalog", "archive/edit actions"]
+    },
+    {
+      "id": "bulk-import-desktop",
+      "title": "Bulk Import workflow",
+      "route": "/finance/import",
+      "filename": "bulk-import-desktop.png",
+      "must_show": ["sample CSV button", "file format guidance", "next steps after import"]
+    },
+    {
+      "id": "year-setup-desktop",
+      "title": "Year Setup workflow",
+      "route": "/finance/year-setup",
+      "filename": "year-setup-desktop.png",
+      "must_show": ["generate year", "activate year", "monthly draft entries"]
+    },
+    {
+      "id": "history-desktop",
+      "title": "History and reporting",
+      "route": "/finance/history",
+      "filename": "history-desktop.png",
+      "must_show": ["paid vs planned", "category breakdown", "payment history"]
+    },
+    {
+      "id": "settings-desktop",
+      "title": "Settings and maintenance",
+      "route": "/finance/settings",
+      "filename": "settings-desktop.png",
+      "must_show": ["currency", "reminders", "cleanup tools"]
+    },
+    {
+      "id": "mobile-current-month",
+      "title": "Mobile Current Month",
+      "route": "/finance/current",
+      "filename": "mobile-current-month.png",
+      "viewport": "390x844",
+      "must_show": ["mobile header", "hamburger menu", "responsive ledger card"]
+    }
+  ],
+  "gifs": [
+    {
+      "id": "first-use-flow",
+      "title": "First-use flow",
+      "filename": "first-use-flow.gif",
+      "steps": [
+        "Bulk Import sample expenses",
+        "Open Year Setup",
+        "Generate year",
+        "Activate year",
+        "Open Current Month",
+        "Mark one item paid"
+      ]
+    }
+  ]
+}

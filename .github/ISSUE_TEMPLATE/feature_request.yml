@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest an improvement for Finance Tracker
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What problem should this solve?
+      description: Explain the household finance workflow or Home Assistant use case.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe how you would like it to work.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Current Month
+        - Add Expense
+        - Bulk Import
+        - Year Setup
+        - History
+        - Settings / reminders
+        - HACS / installation
+        - Other
+    validations:
+      required: true

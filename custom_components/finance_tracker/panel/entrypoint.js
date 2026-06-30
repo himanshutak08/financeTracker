@@ -45,6 +45,7 @@ class FinanceTrackerPanel extends HTMLElement {
     this._settingsError = "";
     this._settingsBusy = false;
     this._reminderRunResult = null;
+    this._cleanupResult = null;
     this._importBusy = false;
     this._importError = "";
     this._importResult = null;
@@ -70,6 +71,7 @@ class FinanceTrackerPanel extends HTMLElement {
     if (!this._booted) {
       this._booted = true;
       window.addEventListener("popstate", this._boundPopstate);
+      this.loadSettings(true);
       if (this._route === "current") {
         this.loadCurrentMonth();
       } else if (this._route === "add") {
@@ -127,6 +129,9 @@ class FinanceTrackerPanel extends HTMLElement {
 
   async markPaid(entry) {
     if (!this._hass || this._busyEntryId) {
+      return;
+    }
+    if (!window.confirm(`Mark ${entry.name} as paid for ${this.formatAmount(entry.remaining_amount || entry.scheduled_amount)}?`)) {
       return;
     }
 
@@ -405,13 +410,15 @@ class FinanceTrackerPanel extends HTMLElement {
     }
   }
 
-  async loadSettings() {
+  async loadSettings(silent = false) {
     if (!this._hass) {
       return;
     }
-    this._settingsLoading = true;
-    this._settingsError = "";
-    this.render();
+    if (!silent) {
+      this._settingsLoading = true;
+      this._settingsError = "";
+      this.render();
+    }
     try {
       this._settings = await this._hass.connection.sendMessagePromise({
         type: "finance_tracker/get_settings",
@@ -419,7 +426,9 @@ class FinanceTrackerPanel extends HTMLElement {
     } catch (err) {
       this._settingsError = err?.message || String(err);
     } finally {
-      this._settingsLoading = false;
+      if (!silent) {
+        this._settingsLoading = false;
+      }
       this.render();
     }
   }
@@ -464,6 +473,65 @@ class FinanceTrackerPanel extends HTMLElement {
         {},
         true
       );
+    } catch (err) {
+      this._settingsError = err?.message || String(err);
+    } finally {
+      this._settingsBusy = false;
+      this.render();
+    }
+  }
+
+  async deleteYearPlan(year) {
+    if (!this._hass || this._settingsBusy) {
+      return;
+    }
+    const planYear = Number(year);
+    if (!Number.isInteger(planYear) || planYear < 2000 || planYear > 2100) {
+      this._settingsError = "Enter a valid year between 2000 and 2100.";
+      this.render();
+      return;
+    }
+    if (!window.confirm(`Delete the ${planYear} Finance Tracker year plan and its ledger rows? Expense definitions will stay.`)) {
+      return;
+    }
+
+    this._settingsBusy = true;
+    this._settingsError = "";
+    this._cleanupResult = null;
+    this.render();
+    try {
+      this._cleanupResult = await this._hass.connection.sendMessagePromise({
+        type: "finance_tracker/delete_year_plan",
+        year: planYear,
+      });
+      if (planYear === this._planYear) {
+        this._yearPlan = null;
+      }
+      await this.loadCurrentMonth();
+    } catch (err) {
+      this._settingsError = err?.message || String(err);
+    } finally {
+      this._settingsBusy = false;
+      this.render();
+    }
+  }
+
+  async clearReminderLog() {
+    if (!this._hass || this._settingsBusy) {
+      return;
+    }
+    if (!window.confirm("Clear reminder delivery history? This lets reminders be sent again if they are still eligible.")) {
+      return;
+    }
+
+    this._settingsBusy = true;
+    this._settingsError = "";
+    this._cleanupResult = null;
+    this.render();
+    try {
+      this._cleanupResult = await this._hass.connection.sendMessagePromise({
+        type: "finance_tracker/clear_reminder_log",
+      });
     } catch (err) {
       this._settingsError = err?.message || String(err);
     } finally {
@@ -526,6 +594,119 @@ class FinanceTrackerPanel extends HTMLElement {
     link.download = "finance-tracker-expenses-sample.csv";
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  exportExpensesCsv() {
+    const expenses = this._expenses?.expenses || [];
+    const rows = expenses.map((expense) => ({
+      name: expense.name,
+      category: expense.category,
+      amount: expense.default_amount,
+      recurrence: expense.recurrence,
+      due_day: expense.due_day || "",
+      start_month: expense.start_month || "",
+      end_month: expense.end_month || "",
+      custom_months: Array.isArray(expense.custom_months) ? expense.custom_months.join("|") : "",
+      icon: expense.icon || "",
+      notes: expense.notes || "",
+      reminder_days: expense.reminder_days,
+      active: expense.is_active ? "yes" : "no",
+    }));
+    this.downloadCsv(
+      `finance-tracker-expenses-${this._today()}.csv`,
+      [
+        "name", "category", "amount", "recurrence", "due_day", "start_month",
+        "end_month", "custom_months", "icon", "notes", "reminder_days", "active",
+      ],
+      rows,
+    );
+  }
+
+  exportCurrentMonthCsv() {
+    const entries = this._data?.entries || [];
+    const rows = entries.map((entry) => ({
+      month_key: entry.month_key,
+      name: entry.name,
+      category: entry.category,
+      scheduled_amount: entry.scheduled_amount,
+      actual_paid_amount: entry.actual_paid_amount,
+      remaining_amount: entry.remaining_amount,
+      due_date: entry.due_date || "",
+      status: entry.status,
+      paid_date: entry.paid_date || "",
+      notes: entry.notes || "",
+    }));
+    this.downloadCsv(
+      `finance-tracker-current-${this._data?.month_key || this._monthKey}.csv`,
+      [
+        "month_key", "name", "category", "scheduled_amount", "actual_paid_amount",
+        "remaining_amount", "due_date", "status", "paid_date", "notes",
+      ],
+      rows,
+    );
+  }
+
+  exportHistoryCsv() {
+    const history = this._history;
+    const rows = [];
+    for (const month of history?.monthly || []) {
+      for (const entry of month.entries || []) {
+        rows.push({
+          row_type: "ledger_entry",
+          year: this._historyYear,
+          month: month.month,
+          name: entry.name,
+          category: entry.category,
+          scheduled_amount: entry.scheduled_amount,
+          actual_paid_amount: entry.actual_paid_amount,
+          remaining_amount: entry.remaining_amount,
+          status: entry.status,
+          paid_date: entry.paid_date || "",
+          note: entry.notes || "",
+        });
+      }
+    }
+    for (const payment of history?.payments || []) {
+      rows.push({
+        row_type: "payment",
+        year: this._historyYear,
+        month: "",
+        name: payment.name,
+        category: payment.category,
+        scheduled_amount: "",
+        actual_paid_amount: payment.amount,
+        remaining_amount: "",
+        status: "paid",
+        paid_date: payment.paid_date,
+        note: payment.note || "",
+      });
+    }
+    this.downloadCsv(
+      `finance-tracker-history-${this._historyYear}.csv`,
+      [
+        "row_type", "year", "month", "name", "category", "scheduled_amount",
+        "actual_paid_amount", "remaining_amount", "status", "paid_date", "note",
+      ],
+      rows,
+    );
+  }
+
+  downloadCsv(filename, columns, rows) {
+    const csv = [
+      columns.join(","),
+      ...rows.map((row) => columns.map((column) => this.csvCell(row[column])).join(",")),
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  csvCell(value) {
+    const text = value === null || value === undefined ? "" : String(value);
+    return `"${text.replaceAll('"', '""')}"`;
   }
 
   navigate(route) {
@@ -995,6 +1176,10 @@ class FinanceTrackerPanel extends HTMLElement {
           opacity: 0.6;
         }
 
+        button {
+          min-height: 44px;
+        }
+
         .expense-list {
           display: grid;
           gap: 10px;
@@ -1182,6 +1367,37 @@ class FinanceTrackerPanel extends HTMLElement {
           margin: 6px 0;
         }
 
+        .getting-started {
+          display: grid;
+          gap: 12px;
+        }
+
+        .checklist {
+          display: grid;
+          gap: 10px;
+          margin-top: 12px;
+        }
+
+        .checklist-item {
+          align-items: start;
+          display: grid;
+          gap: 10px;
+          grid-template-columns: auto 1fr;
+        }
+
+        .checklist-number {
+          align-items: center;
+          background: var(--primary-color);
+          border-radius: 999px;
+          color: var(--text-primary-color, #fff);
+          display: inline-flex;
+          font-size: 12px;
+          font-weight: 700;
+          height: 24px;
+          justify-content: center;
+          width: 24px;
+        }
+
         .error,
         .empty,
         .placeholder {
@@ -1363,8 +1579,12 @@ class FinanceTrackerPanel extends HTMLElement {
       this.loadYearPlan(Number(data.get("year")));
     });
 
-    this.shadowRoot.querySelector("[data-year-generate]")?.addEventListener("click", () => {
-      this.runYearAction("generate_year", { year: this._planYear });
+    this.shadowRoot.querySelectorAll("[data-year-generate]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (window.confirm(`Generate or rebuild the ${this._planYear} draft from active expenses? Existing draft edits for this year may be replaced.`)) {
+          this.runYearAction("generate_year", { year: this._planYear });
+        }
+      });
     });
 
     this.shadowRoot.querySelector("[data-year-activate]")?.addEventListener("click", () => {
@@ -1376,10 +1596,14 @@ class FinanceTrackerPanel extends HTMLElement {
     this.shadowRoot.querySelector("[data-year-copy]")?.addEventListener("submit", (event) => {
       event.preventDefault();
       const data = new FormData(event.currentTarget);
-      this.runYearAction("copy_year", {
-        source_year: Number(data.get("source_year")),
-        target_year: Number(data.get("target_year")),
-      });
+      const sourceYear = Number(data.get("source_year"));
+      const targetYear = Number(data.get("target_year"));
+      if (window.confirm(`Copy ${sourceYear} into ${targetYear}? Existing draft rows for ${targetYear} may be replaced.`)) {
+        this.runYearAction("copy_year", {
+          source_year: sourceYear,
+          target_year: targetYear,
+        });
+      }
     });
 
     this.shadowRoot.querySelectorAll("[data-plan-entry-form]").forEach((form) => {
@@ -1404,6 +1628,16 @@ class FinanceTrackerPanel extends HTMLElement {
       this.runRemindersNow();
     });
 
+    this.shadowRoot.querySelector("[data-delete-year-form]")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      this.deleteYearPlan(data.get("year"));
+    });
+
+    this.shadowRoot.querySelector("[data-clear-reminder-log]")?.addEventListener("click", () => {
+      this.clearReminderLog();
+    });
+
     this.shadowRoot.querySelector("[data-import-form]")?.addEventListener("submit", (event) => {
       event.preventDefault();
       this.importExpensesFile(event.currentTarget);
@@ -1411,6 +1645,18 @@ class FinanceTrackerPanel extends HTMLElement {
 
     this.shadowRoot.querySelector("[data-download-sample]")?.addEventListener("click", () => {
       this.downloadSampleCsv();
+    });
+
+    this.shadowRoot.querySelector("[data-export-expenses]")?.addEventListener("click", () => {
+      this.exportExpensesCsv();
+    });
+
+    this.shadowRoot.querySelector("[data-export-current]")?.addEventListener("click", () => {
+      this.exportCurrentMonthCsv();
+    });
+
+    this.shadowRoot.querySelector("[data-export-history]")?.addEventListener("click", () => {
+      this.exportHistoryCsv();
     });
   }
 
@@ -1457,7 +1703,33 @@ class FinanceTrackerPanel extends HTMLElement {
           <button data-refresh>Refresh</button>
         </div>
         <div class="empty">
-          Generate or activate a year plan first, then this route will render the live ledger.
+          <div class="getting-started">
+            <strong>Getting started</strong>
+            <div>Current Month appears after you add expenses, generate a year plan, and activate it.</div>
+            <div class="checklist">
+              <div class="checklist-item">
+                <span class="checklist-number">1</span>
+                <span>Add expenses manually or use Bulk Import for CSV/XLSX files.</span>
+              </div>
+              <div class="checklist-item">
+                <span class="checklist-number">2</span>
+                <span>Open Year Setup and click Generate ${this._escape(this._planYear)}.</span>
+              </div>
+              <div class="checklist-item">
+                <span class="checklist-number">3</span>
+                <span>Review the draft and click Activate year.</span>
+              </div>
+              <div class="checklist-item">
+                <span class="checklist-number">4</span>
+                <span>Return here to record full or partial payments.</span>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="primary-button" data-route="import">Bulk Import</button>
+              <button class="secondary-button" data-route="add">Add Expense</button>
+              <button class="secondary-button" data-route="year-setup">Year Setup</button>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -1479,7 +1751,7 @@ class FinanceTrackerPanel extends HTMLElement {
               <div class="meta">
                 <span>${this._escape(entry.category)}</span>
                 <span>Due ${this._escape(entry.due_date || "No due date")}</span>
-                <span>Paid ${this._escape(entry.actual_paid_amount.toFixed(2))}</span>
+                <span>Paid ${this._escape(this.formatAmount(entry.actual_paid_amount))}</span>
               </div>
               <div class="entry-tools">
                 ${entry.remaining_amount > 0 ? `
@@ -1536,7 +1808,7 @@ class FinanceTrackerPanel extends HTMLElement {
             </div>
             <div class="amounts">
               <div>Remaining</div>
-              <strong>${this._escape(entry.remaining_amount.toFixed(2))}</strong>
+              <strong>${this._escape(this.formatAmount(entry.remaining_amount))}</strong>
               ${
                 entry.remaining_amount > 0
                   ? `<button class="pay-button" data-entry-id="${entry.entry_id}" ${disabled}>${buttonLabel}</button>`
@@ -1556,20 +1828,23 @@ class FinanceTrackerPanel extends HTMLElement {
           <div class="eyebrow">Current Month</div>
           <div>${this._escape(data.month_key || "Unknown month")}</div>
         </div>
-        <button data-refresh ${this._loading ? "disabled" : ""}>Refresh</button>
+        <div class="form-actions">
+          <button data-refresh ${this._loading ? "disabled" : ""}>Refresh</button>
+          <button class="secondary-button" data-export-current ${this._loading ? "disabled" : ""}>Export CSV</button>
+        </div>
       </div>
       <div class="summary">
         <div class="metric">
           <div class="metric-label">Scheduled</div>
-          <div class="metric-value">${this._escape((summary.scheduled_total || 0).toFixed(2))}</div>
+          <div class="metric-value">${this._escape(this.formatAmount(summary.scheduled_total || 0))}</div>
         </div>
         <div class="metric">
           <div class="metric-label">Paid</div>
-          <div class="metric-value">${this._escape((summary.actual_paid_total || 0).toFixed(2))}</div>
+          <div class="metric-value">${this._escape(this.formatAmount(summary.actual_paid_total || 0))}</div>
         </div>
         <div class="metric">
           <div class="metric-label">Remaining</div>
-          <div class="metric-value">${this._escape((summary.remaining_total || 0).toFixed(2))}</div>
+          <div class="metric-value">${this._escape(this.formatAmount(summary.remaining_total || 0))}</div>
         </div>
         <div class="metric">
           <div class="metric-label">Open Items</div>
@@ -1604,7 +1879,13 @@ class FinanceTrackerPanel extends HTMLElement {
     const listBody = this._expenseLoading
       ? `<div class="placeholder">Loading expense catalog...</div>`
       : expenses.length === 0
-        ? `<div class="empty">No expenses yet. Create the first recurring expense with this form.</div>`
+        ? `<div class="empty">
+            <strong>No expenses yet.</strong>
+            <p>Create the first recurring expense with this form, or import a full list from CSV/XLSX.</p>
+            <div class="form-actions">
+              <button class="primary-button" data-route="import">Bulk Import</button>
+            </div>
+          </div>`
         : `<div class="expense-list">${expenses.map((expense) => `
             <div class="expense-card ${expense.is_active ? "" : "archived"}">
               <div class="expense-card-top">
@@ -1617,7 +1898,7 @@ class FinanceTrackerPanel extends HTMLElement {
                     ${expense.is_active ? "" : '<span class="badge archived">Archived</span>'}
                   </div>
                 </div>
-                <div class="expense-amount">${this._escape(expense.default_amount.toFixed(2))}</div>
+                <div class="expense-amount">${this._escape(this.formatAmount(expense.default_amount))}</div>
               </div>
               ${expense.notes ? `<div class="meta">${this._escape(expense.notes)}</div>` : ""}
               <div class="expense-actions">
@@ -1633,7 +1914,10 @@ class FinanceTrackerPanel extends HTMLElement {
           <div class="eyebrow">Expense Management</div>
           <div>${expenses.length} expense${expenses.length === 1 ? "" : "s"}</div>
         </div>
-        <button data-expense-refresh ${this._expenseLoading || this._expenseBusy ? "disabled" : ""}>Refresh</button>
+        <div class="form-actions">
+          <button data-expense-refresh ${this._expenseLoading || this._expenseBusy ? "disabled" : ""}>Refresh</button>
+          <button class="secondary-button" data-export-expenses ${expenses.length === 0 ? "disabled" : ""}>Export CSV</button>
+        </div>
       </div>
       ${this._expenseError ? `<div class="error">${this._escape(this._expenseError)}</div><br>` : ""}
       <div class="expense-layout">
@@ -1777,7 +2061,14 @@ class FinanceTrackerPanel extends HTMLElement {
     const planBody = this._yearLoading
       ? `<div class="placeholder">Loading ${this._planYear} plan...</div>`
       : !plan
-        ? `<div class="empty">No plan is loaded for ${this._planYear}. Generate it from active expenses or copy a prior year.</div>`
+        ? `<div class="empty">
+            <strong>No plan is loaded for ${this._planYear}.</strong>
+            <p>Generate a draft from active expenses, or copy a prior year if you already have one.</p>
+            <div class="form-actions">
+              <button class="primary-button" data-year-generate ${disabled}>Generate ${this._escape(this._planYear)}</button>
+              <button class="secondary-button" data-route="add">Review expenses</button>
+            </div>
+          </div>`
         : `<div class="plan-list">${[...itemsByMonth.entries()].map(([month, items]) => {
             const monthName = new Intl.DateTimeFormat(undefined, { month: "long" }).format(
               new Date(this._planYear, month - 1, 1)
@@ -1787,7 +2078,7 @@ class FinanceTrackerPanel extends HTMLElement {
               <section class="month-group">
                 <div class="month-heading">
                   <strong>${this._escape(monthName)}</strong>
-                  <span>${items.length} item${items.length === 1 ? "" : "s"} · ${this._escape(total.toFixed(2))}</span>
+                  <span>${items.length} item${items.length === 1 ? "" : "s"} · ${this._escape(this.formatAmount(total))}</span>
                 </div>
                 ${items.map((item) => `
                   <details class="plan-item">
@@ -1796,7 +2087,7 @@ class FinanceTrackerPanel extends HTMLElement {
                         <span class="name">${this._escape(item.name)}</span>
                         <span class="meta">${this._escape(item.category)} · Due ${this._escape(item.due_date || "—")}</span>
                       </span>
-                      <span class="expense-amount">${this._escape(item.scheduled_amount.toFixed(2))}</span>
+                      <span class="expense-amount">${this._escape(this.formatAmount(item.scheduled_amount))}</span>
                     </summary>
                     <form class="inline-form plan-edit" data-plan-entry-form>
                       <input type="hidden" name="entry_id" value="${this._escape(item.entry_id)}">
@@ -1886,22 +2177,32 @@ class FinanceTrackerPanel extends HTMLElement {
           <div class="eyebrow">History</div>
           <div class="section-title">${this._escape(this._historyYear)} reporting</div>
         </div>
-        <form class="inline-form" data-history-year>
-          <div class="field">
-            <label>Year</label>
-            <input name="year" type="number" min="2000" max="2100" value="${this._escape(this._historyYear)}" required>
-          </div>
-          <button class="primary-button" type="submit">Load</button>
-        </form>
+        <div class="form-actions">
+          <form class="inline-form" data-history-year>
+            <div class="field">
+              <label>Year</label>
+              <input name="year" type="number" min="2000" max="2100" value="${this._escape(this._historyYear)}" required>
+            </div>
+            <button class="primary-button" type="submit">Load</button>
+          </form>
+          <button class="secondary-button" data-export-history ${!history || history.entry_count === 0 ? "disabled" : ""}>Export CSV</button>
+        </div>
       </div>
       ${this._historyError ? `<div class="error">${this._escape(this._historyError)}</div><br>` : ""}
       ${!history || history.entry_count === 0 ? `
-        <div class="empty">No ledger history exists for ${this._escape(this._historyYear)}.</div>
+        <div class="empty">
+          <strong>No ledger history exists for ${this._escape(this._historyYear)}.</strong>
+          <p>Generate and activate a year plan, then record payments in Current Month.</p>
+          <div class="form-actions">
+            <button class="primary-button" data-route="year-setup">Open Year Setup</button>
+            <button class="secondary-button" data-route="current">Current Month</button>
+          </div>
+        </div>
       ` : `
         <div class="summary">
-          <div class="metric"><div class="metric-label">Planned</div><div class="metric-value">${this._escape(summary.scheduled_total.toFixed(2))}</div></div>
-          <div class="metric"><div class="metric-label">Paid</div><div class="metric-value">${this._escape(summary.actual_paid_total.toFixed(2))}</div></div>
-          <div class="metric"><div class="metric-label">Remaining</div><div class="metric-value">${this._escape(summary.remaining_total.toFixed(2))}</div></div>
+          <div class="metric"><div class="metric-label">Planned</div><div class="metric-value">${this._escape(this.formatAmount(summary.scheduled_total))}</div></div>
+          <div class="metric"><div class="metric-label">Paid</div><div class="metric-value">${this._escape(this.formatAmount(summary.actual_paid_total))}</div></div>
+          <div class="metric"><div class="metric-label">Remaining</div><div class="metric-value">${this._escape(this.formatAmount(summary.remaining_total))}</div></div>
           <div class="metric"><div class="metric-label">Payments</div><div class="metric-value">${payments.length}</div></div>
         </div>
         <div class="report-grid">
@@ -1917,14 +2218,14 @@ class FinanceTrackerPanel extends HTMLElement {
                 <details class="report-row">
                   <summary class="report-label">
                     <span>${this._escape(monthName)}</span>
-                    <span>${this._escape(monthSummary.actual_paid_total.toFixed(2))} / ${this._escape(monthSummary.scheduled_total.toFixed(2))}</span>
+                    <span>${this._escape(this.formatAmount(monthSummary.actual_paid_total))} / ${this._escape(this.formatAmount(monthSummary.scheduled_total))}</span>
                   </summary>
                   <div class="progress-track"><div class="progress-value" style="width:${progress(monthSummary.actual_paid_total, monthSummary.scheduled_total)}%"></div></div>
                   <div class="payment-list">
                     ${month.entries.map((entry) => `
                       <div class="payment-row">
                         <span>${this._escape(entry.name)} <span class="meta">${this._escape(entry.status)}</span></span>
-                        <span>${this._escape(entry.actual_paid_amount.toFixed(2))} / ${this._escape(entry.scheduled_amount.toFixed(2))}</span>
+                        <span>${this._escape(this.formatAmount(entry.actual_paid_amount))} / ${this._escape(this.formatAmount(entry.scheduled_amount))}</span>
                       </div>
                     `).join("")}
                   </div>
@@ -1939,7 +2240,7 @@ class FinanceTrackerPanel extends HTMLElement {
               <div class="report-row">
                 <div class="report-label">
                   <span>${this._escape(category.category)}</span>
-                  <span>${this._escape(category.actual_paid_amount.toFixed(2))} / ${this._escape(category.scheduled_amount.toFixed(2))}</span>
+                  <span>${this._escape(this.formatAmount(category.actual_paid_amount))} / ${this._escape(this.formatAmount(category.scheduled_amount))}</span>
                 </div>
                 <div class="progress-track"><div class="progress-value" style="width:${progress(category.actual_paid_amount, category.scheduled_amount)}%"></div></div>
               </div>
@@ -1948,7 +2249,13 @@ class FinanceTrackerPanel extends HTMLElement {
           <section class="report-card">
             <div class="eyebrow">Payment History</div>
             <div class="section-title">Recorded transactions</div>
-            ${payments.length === 0 ? `<div class="empty">No payments recorded for this year.</div>` : `
+            ${payments.length === 0 ? `<div class="empty">
+              <strong>No payments recorded for this year.</strong>
+              <p>Use Current Month to mark expenses paid or record partial payments.</p>
+              <div class="form-actions">
+                <button class="primary-button" data-route="current">Open Current Month</button>
+              </div>
+            </div>` : `
               <div class="payment-list">
                 ${payments.map((payment) => `
                   <div class="payment-row">
@@ -1956,7 +2263,7 @@ class FinanceTrackerPanel extends HTMLElement {
                       <strong>${this._escape(payment.name)}</strong>
                       <span class="meta">${this._escape(payment.paid_date)} · ${this._escape(payment.category)}${payment.note ? ` · ${this._escape(payment.note)}` : ""}</span>
                     </span>
-                    <span class="expense-amount">${this._escape(payment.amount.toFixed(2))}</span>
+                    <span class="expense-amount">${this._escape(this.formatAmount(payment.amount))}</span>
                   </div>
                 `).join("")}
               </div>
@@ -1978,6 +2285,7 @@ class FinanceTrackerPanel extends HTMLElement {
       scan_interval_minutes: 60,
     };
     const result = this._reminderRunResult;
+    const cleanup = this._cleanupResult;
 
     return `
       <div class="toolbar">
@@ -1988,6 +2296,7 @@ class FinanceTrackerPanel extends HTMLElement {
       </div>
       ${this._settingsError ? `<div class="error">${this._escape(this._settingsError)}</div><br>` : ""}
       ${result ? `<div class="empty">Reminder scan complete: ${this._escape(result.sent ?? 0)} sent, ${this._escape(result.failed ?? 0)} failed, ${this._escape(result.candidates ?? 0)} eligible.</div><br>` : ""}
+      ${cleanup ? `<div class="empty">Cleanup complete: ${this._escape(JSON.stringify(cleanup))}</div><br>` : ""}
       <div class="expense-layout">
         <section>
           <form class="expense-form" data-settings-form>
@@ -2023,6 +2332,21 @@ class FinanceTrackerPanel extends HTMLElement {
           <p class="meta">Use <strong>persistent_notification.create</strong> for notifications inside Home Assistant, or a service such as <strong>notify.mobile_app_phone</strong> for a device.</p>
           <button class="secondary-button" type="button" data-run-reminders ${this._settingsBusy ? "disabled" : ""}>Run reminder scan now</button>
         </section>
+        <section class="report-card">
+          <div class="eyebrow">Cleanup Tools</div>
+          <div class="section-title">Safe maintenance</div>
+          <p class="meta">These actions do not remove expense definitions or delete the Finance Tracker database. Use them when testing or rebuilding a generated year.</p>
+          <form class="inline-form" data-delete-year-form>
+            <div class="field">
+              <label>Year to delete</label>
+              <input name="year" type="number" min="2000" max="2100" value="${this._escape(this._planYear)}" required>
+            </div>
+            <button class="danger-button" type="submit" ${this._settingsBusy ? "disabled" : ""}>Delete generated year</button>
+          </form>
+          <div class="form-actions" style="margin-top:12px">
+            <button class="secondary-button" type="button" data-clear-reminder-log ${this._settingsBusy ? "disabled" : ""}>Clear reminder log</button>
+          </div>
+        </section>
       </div>
     `;
   }
@@ -2051,6 +2375,20 @@ class FinanceTrackerPanel extends HTMLElement {
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const day = String(now.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+  }
+
+  formatAmount(value) {
+    const amount = Number(value || 0);
+    const currency = String(this._settings?.currency || "INR").toUpperCase();
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } catch (_err) {
+      return `${currency} ${amount.toFixed(2)}`;
+    }
   }
 
   _escape(value) {

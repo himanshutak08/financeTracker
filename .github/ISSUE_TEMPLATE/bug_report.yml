@@ -1,0 +1,46 @@
+name: Bug report
+description: Report a Finance Tracker problem
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks for helping improve Finance Tracker."
+  - type: input
+    id: version
+    attributes:
+      label: Finance Tracker version
+      description: HACS release or manifest version.
+      placeholder: "0.2.11"
+    validations:
+      required: true
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.6.x"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the issue and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste logs from Settings → System → Logs filtered by finance_tracker.
+      render: text

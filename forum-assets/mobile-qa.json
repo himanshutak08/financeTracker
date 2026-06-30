@@ -1,0 +1,21 @@
+{
+  "purpose": "Manual mobile QA checklist before posting Finance Tracker publicly.",
+  "devices": [
+    "Home Assistant Companion App on iOS, narrow phone viewport",
+    "Home Assistant Companion App on Android, narrow phone viewport",
+    "Mobile browser at approximately 390x844",
+    "Tablet browser at approximately 768x1024"
+  ],
+  "themes": ["Home Assistant light theme", "Home Assistant dark theme"],
+  "checks": [
+    "Finance header is visible on mobile.",
+    "Hamburger menu opens the Home Assistant left sidebar.",
+    "Tabs scroll horizontally without pushing the page wider than the viewport.",
+    "Current Month cards do not overflow on long expense names.",
+    "Forms remain usable when the mobile keyboard is open.",
+    "Primary action buttons have at least a 44px touch target.",
+    "Bulk Import next-step guidance is readable on mobile.",
+    "Settings cleanup tools require confirmation dialogs.",
+    "Status badges remain legible in light and dark themes."
+  ]
+}

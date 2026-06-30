@@ -89,7 +89,19 @@ class ExpenseImporterTests(unittest.TestCase):
     def test_reject_invalid_rows_before_import(self) -> None:
         content = b"name,category,amount,recurrence\nRent,Housing,nope,monthly\n"
 
-        with self.assertRaisesRegex(Exception, "invalid amount"):
+        with self.assertRaisesRegex(
+            Exception, "Row 2, column 'amount', value 'nope'"
+        ):
+            importer.parse_expense_file(
+                "expenses.csv", base64.b64encode(content).decode()
+            )
+
+    def test_validation_errors_include_actionable_guidance(self) -> None:
+        content = b"name,category,amount,recurrence,due_day\nRent,Housing,10,weekly,40\n"
+
+        with self.assertRaisesRegex(
+            Exception, "Row 2, column 'recurrence', value 'weekly': Use one of"
+        ):
             importer.parse_expense_file(
                 "expenses.csv", base64.b64encode(content).decode()
             )
