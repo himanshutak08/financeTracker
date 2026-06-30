@@ -16,6 +16,7 @@ The integration is designed for local-first personal finance tracking. Your data
 - Year setup workflow to generate, review, and activate an annual expense plan.
 - Current Month ledger with unpaid items shown first.
 - Full and partial payment recording.
+- Payment undo from Current Month and History.
 - Month-specific edits for amount, due date, category, and notes.
 - History view with monthly, category, and payment breakdowns.
 - CSV exports for expenses, current month, and history.
@@ -125,7 +126,9 @@ These exports are meant for reporting and backup review. Keep backing up `config
 The Settings screen includes safe cleanup tools:
 
 - Delete a generated year plan and its ledger rows.
+- Wipe a selected month ledger and its payments.
 - Clear reminder delivery history so eligible reminders can be sent again.
+- Reset all Finance Tracker data after typing a confirmation phrase.
 
 These actions require confirmation and do not delete expense definitions or remove the database.
 

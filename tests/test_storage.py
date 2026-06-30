@@ -231,6 +231,26 @@ class FinanceTrackerStorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(current["entry_count"], 0)
         self.assertEqual(catalog["count"], 1)
 
+    async def test_cleanup_tools_delete_month_and_reset_database(self) -> None:
+        await self._add_monthly_expense()
+        await self.storage.async_generate_year(2027)
+        january = await self.storage.async_get_current_month(month_key="2027-01")
+        entry_id = january["entries"][0]["entry_id"]
+        payment = await self.storage.async_mark_paid(entry_id, 100.0, "2027-01-10", None)
+        paid_january = await self.storage.async_get_current_month(month_key="2027-01")
+
+        deleted_month = await self.storage.async_delete_month("2027-01")
+        current = await self.storage.async_get_current_month(month_key="2027-01")
+        reset = await self.storage.async_reset_database()
+        catalog = await self.storage.async_list_expenses()
+
+        self.assertEqual(paid_january["entries"][0]["latest_payment_id"], payment["payment_id"])
+        self.assertEqual(deleted_month["deleted_entries"], 1)
+        self.assertEqual(deleted_month["deleted_payments"], 1)
+        self.assertEqual(current["entry_count"], 0)
+        self.assertGreaterEqual(reset["deleted_counts"]["expense_templates"], 1)
+        self.assertEqual(catalog["count"], 0)
+
     async def test_current_month_filters_by_status_and_category(self) -> None:
         await self._add_monthly_expense()
         await self.storage.async_add_expense(

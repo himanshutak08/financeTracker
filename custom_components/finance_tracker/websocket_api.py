@@ -24,6 +24,8 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_get_settings)
     websocket_api.async_register_command(hass, ws_import_expenses_file)
     websocket_api.async_register_command(hass, ws_delete_year_plan)
+    websocket_api.async_register_command(hass, ws_delete_month)
+    websocket_api.async_register_command(hass, ws_reset_database)
     websocket_api.async_register_command(hass, ws_clear_reminder_log)
 
 
@@ -210,6 +212,49 @@ async def ws_delete_year_plan(
     """Delete one generated year plan and its ledger rows."""
     try:
         result = await _storage(hass).async_delete_year_plan(msg["year"])
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "home_assistant_error", str(err))
+        return
+
+    connection.send_message(websocket_api.result_message(msg["id"], result))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "finance_tracker/delete_month",
+        vol.Required("month_key"): str,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_delete_month(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Delete one generated month ledger."""
+    try:
+        result = await _storage(hass).async_delete_month(msg["month_key"])
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "home_assistant_error", str(err))
+        return
+
+    connection.send_message(websocket_api.result_message(msg["id"], result))
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "finance_tracker/reset_database"}
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_reset_database(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Delete all Finance Tracker user data while keeping the schema."""
+    try:
+        result = await _storage(hass).async_reset_database()
     except HomeAssistantError as err:
         connection.send_error(msg["id"], "home_assistant_error", str(err))
         return

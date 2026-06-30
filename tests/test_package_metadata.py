@@ -68,6 +68,8 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn("## Known limitations", readme)
         self.assertIn("## Roadmap", readme)
         self.assertIn("## Support and feedback", readme)
+        self.assertIn("Payment undo", readme)
+        self.assertIn("Wipe a selected month ledger", readme)
 
     def test_community_forum_post_draft_is_packaged(self) -> None:
         draft_path = ROOT / "forum-assets" / "community-post.json"
@@ -80,7 +82,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.3.0")
+        self.assertEqual(manifest["version"], "0.3.1")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -158,12 +160,20 @@ class PackageMetadataTests(unittest.TestCase):
         storage_source = (INTEGRATION / "storage.py").read_text()
 
         self.assertIn("data-delete-year-form", panel_source)
+        self.assertIn("data-delete-month-form", panel_source)
+        self.assertIn("data-reset-database", panel_source)
         self.assertIn("data-clear-reminder-log", panel_source)
         self.assertIn('type: "finance_tracker/delete_year_plan"', panel_source)
+        self.assertIn('type: "finance_tracker/delete_month"', panel_source)
+        self.assertIn('type: "finance_tracker/reset_database"', panel_source)
         self.assertIn('type: "finance_tracker/clear_reminder_log"', panel_source)
         self.assertIn('"finance_tracker/delete_year_plan"', websocket_source)
+        self.assertIn('"finance_tracker/delete_month"', websocket_source)
+        self.assertIn('"finance_tracker/reset_database"', websocket_source)
         self.assertIn('"finance_tracker/clear_reminder_log"', websocket_source)
         self.assertIn("async_delete_year_plan", storage_source)
+        self.assertIn("async_delete_month", storage_source)
+        self.assertIn("async_reset_database", storage_source)
         self.assertIn("async_clear_reminder_log", storage_source)
 
     def test_panel_uses_settings_currency_for_display_amounts(self) -> None:
@@ -185,6 +195,18 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn("Activate the ${this._planYear} plan", panel_source)
         self.assertIn("Copy ${sourceYear} into ${targetYear}", panel_source)
         self.assertIn("Delete the ${planYear} Finance Tracker year plan", panel_source)
+        self.assertIn("Wipe the ${targetMonth} month ledger", panel_source)
+        self.assertIn("Type RESET to continue", panel_source)
+
+    def test_panel_exposes_payment_undo_actions(self) -> None:
+        panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
+        storage_source = (INTEGRATION / "storage.py").read_text()
+
+        self.assertIn("undoPayment(paymentId", panel_source)
+        self.assertIn("data-undo-payment", panel_source)
+        self.assertIn('"undo_payment"', panel_source)
+        self.assertIn("latest_payment_id", storage_source)
+        self.assertIn("latest_payment_amount", storage_source)
 
     def test_empty_states_offer_next_actions(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()

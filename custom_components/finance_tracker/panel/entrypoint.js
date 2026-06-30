@@ -187,6 +187,38 @@ class FinanceTrackerPanel extends HTMLElement {
     }
   }
 
+  async undoPayment(paymentId, label = "this payment") {
+    if (!this._hass || this._busyEntryId || this._settingsBusy) {
+      return;
+    }
+    if (!window.confirm(`Undo ${label}? The linked expense balance will be recalculated.`)) {
+      return;
+    }
+
+    this._error = "";
+    this._historyError = "";
+    this.render();
+    try {
+      await this._hass.callService("finance_tracker", "undo_payment", {
+        payment_id: paymentId,
+      });
+      if (this._route === "history") {
+        await this.loadHistory(this._historyYear);
+      } else {
+        await this.loadCurrentMonth();
+      }
+    } catch (err) {
+      const message = err?.message || String(err);
+      if (this._route === "history") {
+        this._historyError = message;
+      } else {
+        this._error = message;
+      }
+    } finally {
+      this.render();
+    }
+  }
+
   async updateCurrentEntry(form) {
     if (!this._hass || this._busyEntryId) {
       return;
@@ -507,6 +539,74 @@ class FinanceTrackerPanel extends HTMLElement {
       if (planYear === this._planYear) {
         this._yearPlan = null;
       }
+      await this.loadCurrentMonth();
+    } catch (err) {
+      this._settingsError = err?.message || String(err);
+    } finally {
+      this._settingsBusy = false;
+      this.render();
+    }
+  }
+
+  async deleteMonth(monthKey) {
+    if (!this._hass || this._settingsBusy) {
+      return;
+    }
+    const targetMonth = String(monthKey || "").trim();
+    if (!targetMonth) {
+      this._settingsError = "Choose a month to wipe.";
+      this.render();
+      return;
+    }
+    if (!window.confirm(`Wipe the ${targetMonth} month ledger and its payments? Expense definitions and other months will stay.`)) {
+      return;
+    }
+
+    this._settingsBusy = true;
+    this._settingsError = "";
+    this._cleanupResult = null;
+    this.render();
+    try {
+      this._cleanupResult = await this._hass.connection.sendMessagePromise({
+        type: "finance_tracker/delete_month",
+        month_key: targetMonth,
+      });
+      if (targetMonth === this._monthKey) {
+        await this.loadCurrentMonth();
+      }
+    } catch (err) {
+      this._settingsError = err?.message || String(err);
+    } finally {
+      this._settingsBusy = false;
+      this.render();
+    }
+  }
+
+  async resetDatabase() {
+    if (!this._hass || this._settingsBusy) {
+      return;
+    }
+    const confirmation = window.prompt(
+      "This deletes all Finance Tracker expenses, year plans, month ledgers, payments, reminders, and settings. Type RESET to continue."
+    );
+    if (confirmation !== "RESET") {
+      return;
+    }
+
+    this._settingsBusy = true;
+    this._settingsError = "";
+    this._cleanupResult = null;
+    this.render();
+    try {
+      this._cleanupResult = await this._hass.connection.sendMessagePromise({
+        type: "finance_tracker/reset_database",
+      });
+      this._data = null;
+      this._expenses = null;
+      this._yearPlan = null;
+      this._history = null;
+      this._settings = null;
+      await this.loadSettings(true);
       await this.loadCurrentMonth();
     } catch (err) {
       this._settingsError = err?.message || String(err);
@@ -1514,6 +1614,15 @@ class FinanceTrackerPanel extends HTMLElement {
       });
     });
 
+    this.shadowRoot.querySelectorAll("[data-undo-payment]").forEach((button) => {
+      button.addEventListener("click", () => {
+        this.undoPayment(
+          button.dataset.undoPayment,
+          button.dataset.undoPaymentLabel || "this payment",
+        );
+      });
+    });
+
     this.shadowRoot.querySelector("[data-month-filters]")?.addEventListener("submit", (event) => {
       event.preventDefault();
       const data = new FormData(event.currentTarget);
@@ -1634,8 +1743,18 @@ class FinanceTrackerPanel extends HTMLElement {
       this.deleteYearPlan(data.get("year"));
     });
 
+    this.shadowRoot.querySelector("[data-delete-month-form]")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      this.deleteMonth(data.get("month_key"));
+    });
+
     this.shadowRoot.querySelector("[data-clear-reminder-log]")?.addEventListener("click", () => {
       this.clearReminderLog();
+    });
+
+    this.shadowRoot.querySelector("[data-reset-database]")?.addEventListener("click", () => {
+      this.resetDatabase();
     });
 
     this.shadowRoot.querySelector("[data-import-form]")?.addEventListener("submit", (event) => {
@@ -1812,6 +1931,11 @@ class FinanceTrackerPanel extends HTMLElement {
               ${
                 entry.remaining_amount > 0
                   ? `<button class="pay-button" data-entry-id="${entry.entry_id}" ${disabled}>${buttonLabel}</button>`
+                  : ""
+              }
+              ${
+                entry.latest_payment_id
+                  ? `<button class="secondary-button" data-undo-payment="${this._escape(entry.latest_payment_id)}" data-undo-payment-label="${this._escape(`the latest payment for ${entry.name}`)}" ${disabled}>Undo last payment</button>`
                   : ""
               }
             </div>
@@ -2264,6 +2388,7 @@ class FinanceTrackerPanel extends HTMLElement {
                       <span class="meta">${this._escape(payment.paid_date)} · ${this._escape(payment.category)}${payment.note ? ` · ${this._escape(payment.note)}` : ""}</span>
                     </span>
                     <span class="expense-amount">${this._escape(this.formatAmount(payment.amount))}</span>
+                    <button class="secondary-button" data-undo-payment="${this._escape(payment.payment_id)}" data-undo-payment-label="${this._escape(`${this.formatAmount(payment.amount)} payment for ${payment.name}`)}">Undo</button>
                   </div>
                 `).join("")}
               </div>
@@ -2343,8 +2468,16 @@ class FinanceTrackerPanel extends HTMLElement {
             </div>
             <button class="danger-button" type="submit" ${this._settingsBusy ? "disabled" : ""}>Delete generated year</button>
           </form>
+          <form class="inline-form" data-delete-month-form style="margin-top:12px">
+            <div class="field">
+              <label>Month to wipe</label>
+              <input name="month_key" type="month" value="${this._escape(this._monthKey)}" required>
+            </div>
+            <button class="danger-button" type="submit" ${this._settingsBusy ? "disabled" : ""}>Wipe month ledger</button>
+          </form>
           <div class="form-actions" style="margin-top:12px">
             <button class="secondary-button" type="button" data-clear-reminder-log ${this._settingsBusy ? "disabled" : ""}>Clear reminder log</button>
+            <button class="danger-button" type="button" data-reset-database ${this._settingsBusy ? "disabled" : ""}>Reset all Finance data</button>
           </div>
         </section>
       </div>

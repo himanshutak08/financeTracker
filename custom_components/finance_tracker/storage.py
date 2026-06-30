@@ -212,6 +212,14 @@ class FinanceTrackerStorage:
         """Clear reminder dedupe history without touching expenses or payments."""
         return await self.hass.async_add_executor_job(self._clear_reminder_log)
 
+    async def async_delete_month(self, month_key: str) -> dict[str, Any]:
+        """Delete one generated month ledger and its payments."""
+        return await self.hass.async_add_executor_job(self._delete_month, month_key)
+
+    async def async_reset_database(self) -> dict[str, Any]:
+        """Delete all Finance Tracker user data while keeping the schema."""
+        return await self.hass.async_add_executor_job(self._reset_database)
+
     async def async_list_expenses(
         self, active_only: bool = False, category: str | None = None
     ) -> dict[str, Any]:
@@ -1025,6 +1033,65 @@ class FinanceTrackerStorage:
 
         return {"deleted_notifications": deleted}
 
+    def _delete_month(self, month_key: str) -> dict[str, Any]:
+        normalized_month = str(month_key or "").strip()
+        if not _is_month_key(normalized_month):
+            raise HomeAssistantError("month_key must use YYYY-MM format")
+
+        with self._connect() as conn:
+            entry_ids = [
+                row["entry_id"]
+                for row in conn.execute(
+                    "SELECT entry_id FROM month_entries WHERE month_key = ?",
+                    (normalized_month,),
+                ).fetchall()
+            ]
+            if not entry_ids:
+                raise HomeAssistantError(f"No generated month entries found for {normalized_month}")
+
+            payment_count = self._delete_month_entries(conn, entry_ids)
+            self._insert_audit_event(
+                conn,
+                "month_entries",
+                normalized_month,
+                "month_deleted",
+                {
+                    "month_key": normalized_month,
+                    "deleted_entries": len(entry_ids),
+                    "deleted_payments": payment_count,
+                },
+            )
+
+        return {
+            "month_key": normalized_month,
+            "deleted_entries": len(entry_ids),
+            "deleted_payments": payment_count,
+        }
+
+    def _reset_database(self) -> dict[str, Any]:
+        tables = (
+            "payments",
+            "notifications_log",
+            "month_entries",
+            "year_plan_items",
+            "year_plans",
+            "template_month_rules",
+            "expense_templates",
+            "app_settings",
+            "audit_events",
+        )
+        with self._connect() as conn:
+            deleted_counts = {
+                table: conn.execute(
+                    f"SELECT COUNT(*) AS count FROM {table}"
+                ).fetchone()["count"]
+                for table in tables
+            }
+            for table in tables:
+                conn.execute(f"DELETE FROM {table}")
+
+        return {"deleted_counts": deleted_counts}
+
     def _list_expenses(
         self, active_only: bool, category: str | None
     ) -> dict[str, Any]:
@@ -1088,6 +1155,20 @@ class FinanceTrackerStorage:
                     me.status,
                     me.notes,
                     me.paid_date,
+                    (
+                        SELECT p.payment_id
+                        FROM payments p
+                        WHERE p.entry_id = me.entry_id
+                        ORDER BY p.paid_date DESC, p.created_at DESC
+                        LIMIT 1
+                    ) AS latest_payment_id,
+                    (
+                        SELECT p.amount
+                        FROM payments p
+                        WHERE p.entry_id = me.entry_id
+                        ORDER BY p.paid_date DESC, p.created_at DESC
+                        LIMIT 1
+                    ) AS latest_payment_amount,
                     yp.plan_year,
                     yp.status AS plan_status
                 FROM month_entries me
@@ -1875,6 +1956,29 @@ class FinanceTrackerStorage:
                 plan_item_ids,
             )
 
+    def _delete_month_entries(self, conn: sqlite3.Connection, entry_ids: Sequence[str]) -> int:
+        if not entry_ids:
+            return 0
+
+        placeholders = ",".join("?" for _ in entry_ids)
+        payment_count = conn.execute(
+            f"SELECT COUNT(*) AS count FROM payments WHERE entry_id IN ({placeholders})",
+            list(entry_ids),
+        ).fetchone()["count"]
+        conn.execute(
+            f"DELETE FROM notifications_log WHERE entry_id IN ({placeholders})",
+            list(entry_ids),
+        )
+        conn.execute(
+            f"DELETE FROM payments WHERE entry_id IN ({placeholders})",
+            list(entry_ids),
+        )
+        conn.execute(
+            f"DELETE FROM month_entries WHERE entry_id IN ({placeholders})",
+            list(entry_ids),
+        )
+        return int(payment_count)
+
     def _serialize_expense_template(
         self,
         row: sqlite3.Row,
@@ -1914,6 +2018,7 @@ class FinanceTrackerStorage:
 
     def _serialize_month_entry(self, row: sqlite3.Row, today: str) -> dict[str, Any]:
         status = _derive_entry_status(row["status"], row["due_date"], today)
+        has_latest_payment = "latest_payment_id" in row.keys()
         return {
             "entry_id": row["entry_id"],
             "plan_item_id": row["plan_item_id"],
@@ -1930,6 +2035,10 @@ class FinanceTrackerStorage:
             "stored_status": row["status"],
             "notes": row["notes"],
             "paid_date": row["paid_date"],
+            "latest_payment_id": row["latest_payment_id"] if has_latest_payment else None,
+            "latest_payment_amount": (
+                _maybe_float(row["latest_payment_amount"]) if has_latest_payment else None
+            ),
             "is_overdue": status == "overdue",
             "plan_year": row["plan_year"],
             "plan_status": row["plan_status"],
@@ -2095,6 +2204,17 @@ def _maybe_int(value: Any) -> int | None:
 
 def _current_month_key() -> str:
     return date.today().strftime("%Y-%m")
+
+
+def _is_month_key(value: str) -> bool:
+    if len(value) != 7 or value[4] != "-":
+        return False
+    try:
+        year = int(value[:4])
+        month = int(value[5:7])
+    except ValueError:
+        return False
+    return 2000 <= year <= 2100 and 1 <= month <= 12
 
 
 def _normalize_iso_date(value: str) -> str:
