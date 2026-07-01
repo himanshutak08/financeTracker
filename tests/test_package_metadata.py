@@ -82,7 +82,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.3.8")
+        self.assertEqual(manifest["version"], "0.3.9")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -257,8 +257,10 @@ class PackageMetadataTests(unittest.TestCase):
 
         self.assertIn("₹ Indian Rupee (INR)", panel_source)
         self.assertIn("€ Euro (EUR)", panel_source)
-        self.assertIn('<select id="settings-currency"', panel_source)
-        self.assertNotIn('<input id="settings-currency"', panel_source)
+        self.assertIn('<input id="settings-currency"', panel_source)
+        self.assertIn('list="settings-currencies"', panel_source)
+        self.assertIn('pattern="[A-Za-z]{3}"', panel_source)
+        self.assertIn("enter any three-letter currency code", panel_source)
         self.assertIn('aria-label="Finance sections"', panel_source)
         self.assertIn('aria-current="page"', panel_source)
         self.assertIn('role="alert"', panel_source)

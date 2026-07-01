@@ -2821,11 +2821,8 @@ class FinanceTrackerPanel extends HTMLElement {
       ["SGD", "$ Singapore Dollar (SGD)"],
       ["ZAR", "R South African Rand (ZAR)"],
     ];
-    if (!currencies.some(([code]) => code === settings.currency)) {
-      currencies.push([settings.currency, `${settings.currency} (current)`]);
-    }
     const currencyOptions = currencies.map(([code, label]) =>
-      `<option value="${this._escape(code)}" ${settings.currency === code ? "selected" : ""}>${this._escape(label)}</option>`
+      `<option value="${this._escape(code)}">${this._escape(label)}</option>`
     ).join("");
     const result = this._reminderRunResult;
     const cleanup = this._cleanupResult;
@@ -2846,7 +2843,9 @@ class FinanceTrackerPanel extends HTMLElement {
             <div class="form-grid">
               <div class="field">
                 <label for="settings-currency">Display currency</label>
-                <select id="settings-currency" name="currency" required>${currencyOptions}</select>
+                <input id="settings-currency" name="currency" list="settings-currencies" required minlength="3" maxlength="3" pattern="[A-Za-z]{3}" value="${this._escape(settings.currency)}" placeholder="e.g. INR, USD or BDT" autocapitalize="characters">
+                <datalist id="settings-currencies">${currencyOptions}</datalist>
+                <span class="meta">Choose a suggestion or enter any three-letter currency code. The code is saved in uppercase.</span>
               </div>
               <div class="field">
                 <label for="settings-interval">Scan interval (minutes)</label>
