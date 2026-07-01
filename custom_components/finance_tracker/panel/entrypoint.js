@@ -1189,6 +1189,23 @@ class FinanceTrackerPanel extends HTMLElement {
           margin-bottom: 18px;
         }
 
+        .history-actions {
+          align-items: end;
+          display: flex;
+          flex-wrap: nowrap;
+          gap: 8px;
+        }
+
+        .history-filter {
+          align-items: end;
+          display: flex;
+          gap: 8px;
+        }
+
+        .history-filter .field {
+          width: 140px;
+        }
+
         .pay-button {
           background: var(--primary-color);
           border: 0;
@@ -1773,6 +1790,13 @@ class FinanceTrackerPanel extends HTMLElement {
           .amounts { justify-items: start; text-align: left; }
           .toolbar { align-items: flex-start; flex-direction: column; }
           .toolbar .form-actions { width: 100%; }
+          .history-actions,
+          .history-filter {
+            align-items: stretch;
+            flex-direction: column;
+            width: 100%;
+          }
+          .history-filter .field { width: 100%; }
           .expense-layout, .form-grid { grid-template-columns: 1fr; }
           .field.full { grid-column: auto; }
           .inline-form { align-items: stretch; flex-direction: column; }
@@ -2607,16 +2631,16 @@ class FinanceTrackerPanel extends HTMLElement {
       : 0;
 
     return `
-      <div class="toolbar">
+      <div class="toolbar history-toolbar">
         <div>
           <div class="eyebrow">History</div>
           <div class="section-title">${this._escape(this._historyYear)} reporting</div>
         </div>
-        <div class="form-actions">
-          <form class="inline-form" data-history-year>
+        <div class="history-actions">
+          <form class="history-filter" data-history-year>
             <div class="field">
-              <label>Year</label>
-              <input name="year" type="number" min="2000" max="2100" value="${this._escape(this._historyYear)}" required>
+              <label for="history-year">Year</label>
+              <input id="history-year" name="year" type="number" min="2000" max="2100" value="${this._escape(this._historyYear)}" required>
             </div>
             <button class="primary-button" type="submit">Load</button>
           </form>

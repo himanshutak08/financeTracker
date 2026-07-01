@@ -82,7 +82,7 @@ class PackageMetadataTests(unittest.TestCase):
     def test_release_version_matches_panel_cache_hotfix(self) -> None:
         manifest = json.loads((INTEGRATION / "manifest.json").read_text())
 
-        self.assertEqual(manifest["version"], "0.3.7")
+        self.assertEqual(manifest["version"], "0.3.8")
 
     def test_registered_panel_name_matches_custom_element(self) -> None:
         constants = (INTEGRATION / "const.py").read_text()
@@ -153,6 +153,9 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn("data-export-expenses", panel_source)
         self.assertIn("data-export-current", panel_source)
         self.assertIn("data-export-history", panel_source)
+        self.assertIn('class="history-actions"', panel_source)
+        self.assertIn('class="history-filter"', panel_source)
+        self.assertIn('for="history-year"', panel_source)
 
     def test_settings_exposes_safe_cleanup_tools(self) -> None:
         panel_source = (INTEGRATION / "panel" / "entrypoint.js").read_text()
