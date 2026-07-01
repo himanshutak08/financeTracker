@@ -1408,6 +1408,7 @@ class FinanceTrackerPanel extends HTMLElement {
         }
 
         .field {
+          align-content: start;
           display: grid;
           gap: 6px;
         }
@@ -2798,6 +2799,7 @@ class FinanceTrackerPanel extends HTMLElement {
       mobile_notification_service: "",
       scan_interval_minutes: 60,
     };
+    const currentCurrency = String(settings.currency || "INR").trim().toUpperCase();
     const mobileNotifyServices = Object.keys(this._hass?.services?.notify || {})
       .filter((service) => service.startsWith("mobile_app_"))
       .sort();
@@ -2843,9 +2845,9 @@ class FinanceTrackerPanel extends HTMLElement {
             <div class="form-grid">
               <div class="field">
                 <label for="settings-currency">Display currency</label>
-                <input id="settings-currency" name="currency" list="settings-currencies" required minlength="3" maxlength="3" pattern="[A-Za-z]{3}" value="${this._escape(settings.currency)}" placeholder="e.g. INR, USD or BDT" autocapitalize="characters">
+                <input id="settings-currency" name="currency" list="settings-currencies" required minlength="3" maxlength="3" pattern="[A-Za-z]{3}" value="${this._escape(currentCurrency)}" placeholder="e.g. INR, USD or BDT" autocapitalize="characters">
                 <datalist id="settings-currencies">${currencyOptions}</datalist>
-                <span class="meta">Choose a suggestion or enter any three-letter currency code. The code is saved in uppercase.</span>
+                <span class="meta">Choose a suggestion or enter a three-letter code.</span>
               </div>
               <div class="field">
                 <label for="settings-interval">Scan interval (minutes)</label>
