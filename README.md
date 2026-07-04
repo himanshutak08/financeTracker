@@ -140,7 +140,15 @@ The Expense Catalog also supports multi-select maintenance:
 
 ## Phone notifications
 
-Install and sign in to the Home Assistant Companion App, then open **Finance → Settings**. Choose the detected `notify.mobile_app_…` service under **Phone notification service**, save, and use **Send test to phone**. Finance Tracker continues creating the configured Home Assistant notification and also sends eligible reminders to the selected phone.
+Install and sign in to the Home Assistant Companion App, then open **Finance → Settings**. Choose the detected `notify.mobile_app_…` service under **Phone notification service**, save, and use **Send test to phone**.
+
+Reminders are sent as daily digests at the configured local time (10:00 PM by default), rather than as one notification per expense. Finance Tracker sends at most one digest for each non-empty group:
+
+- **Action required** for overdue and due-today expenses.
+- **Due tomorrow** for expenses due the next day.
+- **Upcoming** for the remaining expense-specific reminder window.
+
+Each digest includes every matching expense name, its due date, the item count, and the total remaining amount. The hourly scan remains available for delivery retries but does not repeat a successfully delivered digest on the same day.
 
 ## Removing
 

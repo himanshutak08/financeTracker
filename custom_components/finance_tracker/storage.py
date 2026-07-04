@@ -146,6 +146,7 @@ DEFAULT_SETTINGS = {
     "notification_service": "persistent_notification.create",
     "mobile_notification_service": "",
     "scan_interval_minutes": 60,
+    "digest_time": "22:00",
 }
 
 SCHEMA_VERSION = 1
@@ -1641,6 +1642,15 @@ class FinanceTrackerStorage:
                     "scan_interval_minutes must be between 5 and 1440"
                 )
             normalized["scan_interval_minutes"] = interval
+        if "digest_time" in changes:
+            digest_time = str(changes["digest_time"]).strip()
+            try:
+                hour, minute = (int(part) for part in digest_time.split(":"))
+            except (TypeError, ValueError):
+                raise HomeAssistantError("digest_time must use HH:MM format") from None
+            if not 0 <= hour <= 23 or not 0 <= minute <= 59:
+                raise HomeAssistantError("digest_time must use HH:MM format")
+            normalized["digest_time"] = f"{hour:02d}:{minute:02d}"
 
         now = _utcnow()
         with self._connect() as conn:

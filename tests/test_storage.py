@@ -426,10 +426,12 @@ class FinanceTrackerStorageTests(unittest.IsolatedAsyncioTestCase):
                 "notification_service": "notify.mobile_app_phone",
                 "mobile_notification_service": "notify.mobile_app_second_phone",
                 "scan_interval_minutes": 30,
+                "digest_time": "22:15",
             }
         )
         self.assertEqual(settings["currency"], "USD")
         self.assertEqual(settings["scan_interval_minutes"], 30)
+        self.assertEqual(settings["digest_time"], "22:15")
         self.assertEqual(
             settings["mobile_notification_service"],
             "notify.mobile_app_second_phone",

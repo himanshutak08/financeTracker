@@ -559,6 +559,7 @@ class FinanceTrackerPanel extends HTMLElement {
         notification_service: String(data.get("notification_service") || "").trim(),
         mobile_notification_service: String(data.get("mobile_notification_service") || "").trim(),
         scan_interval_minutes: Number(data.get("scan_interval_minutes")),
+        digest_time: String(data.get("digest_time") || "22:00"),
       });
       await this.loadSettings();
     } catch (err) {
@@ -2798,6 +2799,7 @@ class FinanceTrackerPanel extends HTMLElement {
       notification_service: "persistent_notification.create",
       mobile_notification_service: "",
       scan_interval_minutes: 60,
+      digest_time: "22:00",
     };
     const currentCurrency = String(settings.currency || "INR").trim().toUpperCase();
     const mobileNotifyServices = Object.keys(this._hass?.services?.notify || {})
@@ -2853,6 +2855,11 @@ class FinanceTrackerPanel extends HTMLElement {
                 <label for="settings-interval">Scan interval (minutes)</label>
                 <input id="settings-interval" name="scan_interval_minutes" type="number" min="5" max="1440" required value="${this._escape(settings.scan_interval_minutes)}">
               </div>
+              <div class="field">
+                <label for="settings-digest-time">Daily digest time</label>
+                <input id="settings-digest-time" name="digest_time" type="time" required value="${this._escape(settings.digest_time || "22:00")}">
+                <span class="meta">Uses the Home Assistant local time zone.</span>
+              </div>
               <div class="field full">
                 <label for="settings-service">Home Assistant notification service</label>
                 <input id="settings-service" name="notification_service" required value="${this._escape(settings.notification_service)}" placeholder="notify.mobile_app_phone">
@@ -2879,7 +2886,7 @@ class FinanceTrackerPanel extends HTMLElement {
         <section class="report-card">
           <div class="eyebrow">Reminder Engine</div>
           <div class="section-title">Delivery behavior</div>
-          <p class="meta">Each expense uses its reminder-days setting. Upcoming, due-today, and overdue reminders are sent at most once per entry per day.</p>
+          <p class="meta">At the configured time, reminders are grouped into Action required, Due tomorrow, and Upcoming digests. Every matching expense name is included, with no repeated hourly alerts.</p>
           <p class="meta">The Home Assistant target creates an in-app notification. Add a detected <strong>notify.mobile_app_…</strong> target to send the same reminder to your phone as well.</p>
           <button class="secondary-button" type="button" data-run-reminders ${this._settingsBusy ? "disabled" : ""}>Run reminder scan now</button>
         </section>

@@ -140,6 +140,7 @@ UPDATE_SETTINGS_SCHEMA = vol.Schema(
         vol.Optional("scan_interval_minutes"): vol.All(
             vol.Coerce(int), vol.Range(min=5, max=1440)
         ),
+        vol.Optional("digest_time"): str,
     }
 )
 RUN_REMINDERS_SCHEMA = vol.Schema({})
@@ -423,7 +424,7 @@ class FinanceTrackerServiceManager:
         manager = self._hass.data[DOMAIN].get(REMINDER_MANAGER_KEY)
         if manager is None:
             return {"enabled": False, "candidates": 0, "sent": 0, "failed": 0}
-        return await manager.async_run()
+        return await manager.async_run(force=True)
 
     async def _handle_run_diagnostics(self, call: ServiceCall) -> dict[str, Any]:
         return await self._storage.async_run_diagnostics()

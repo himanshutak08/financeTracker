@@ -234,6 +234,10 @@ update_settings:
         number:
           min: 5
           max: 1440
+    digest_time:
+      description: Local time to send the grouped daily reminder digest.
+      selector:
+        time:
 run_reminders:
   name: Run reminders
   description: Scan and deliver eligible reminders immediately.
