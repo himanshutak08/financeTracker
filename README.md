@@ -66,7 +66,9 @@ Finance Tracker uses a simple setup flow:
 5. Click **Activate year**.
 6. Open **Current Month** to record payments.
 
-Bulk import only creates expense definitions. Current Month entries appear after you generate and activate a year plan.
+Bulk import creates expense definitions. For the first year, generate and activate a year plan before using Current Month.
+
+After a year plan exists, adding or importing an expense also adds any missing occurrence scheduled for the selected month. This sync preserves existing month entries and payments. Use **Current Month → Sync missing expenses** to add matching definitions saved before this version was installed. Future months still need a generated and activated year plan.
 
 ## Bulk import CSV format
 
