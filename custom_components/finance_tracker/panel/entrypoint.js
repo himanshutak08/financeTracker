@@ -28,6 +28,7 @@ class FinanceTrackerPanel extends HTMLElement {
     this._expenses = null;
     this._expenseLoading = false;
     this._expenseError = "";
+    this._expenseNotice = "";
     this._expenseBusy = false;
     this._editingExpenseId = null;
     this._expenseDraft = null;
@@ -48,9 +49,13 @@ class FinanceTrackerPanel extends HTMLElement {
     this._settingsBusy = false;
     this._reminderRunResult = null;
     this._cleanupResult = null;
+    this._monthSyncBusy = false;
+    this._monthSyncMessage = "";
+    this._monthSyncError = "";
     this._importBusy = false;
     this._importError = "";
     this._importResult = null;
+    this._importSyncResult = "";
     this._boundPopstate = () => {
       this._route = this._routeFromLocation();
       this.render();
@@ -313,7 +318,9 @@ class FinanceTrackerPanel extends HTMLElement {
 
     this._expenseBusy = true;
     this._expenseError = "";
+    this._expenseNotice = "";
     this.render();
+    let saved = false;
     try {
       if (this._editingExpenseId) {
         await this._hass.callService("finance_tracker", "update_expense", {
@@ -323,13 +330,72 @@ class FinanceTrackerPanel extends HTMLElement {
       } else {
         await this._hass.callService("finance_tracker", "add_expense", payload);
       }
+      saved = true;
       this._editingExpenseId = null;
       this._expenseDraft = null;
       await this.loadExpenses();
     } catch (err) {
       this._expenseError = err?.message || String(err);
+    }
+
+    if (saved) {
+      try {
+        const sync = await this.syncMonthLedger(this._monthKey);
+        this._expenseNotice = this.monthSyncSummary(sync);
+      } catch (err) {
+        this._expenseNotice = `Expense saved, but ${this._monthKey} could not be synced: ${err?.message || String(err)}`;
+      }
+    }
+
+    try {
+      // Refresh the visible ledger only when the user is currently viewing it.
+      if (saved && this._route === "current") {
+        await this.loadCurrentMonth();
+      }
     } finally {
       this._expenseBusy = false;
+      this.render();
+    }
+  }
+
+  async syncMonthLedger(monthKey) {
+    if (!this._hass) {
+      throw new Error("Home Assistant is not connected.");
+    }
+    return this._hass.connection.sendMessagePromise({
+      type: "finance_tracker/sync_month",
+      month_key: monthKey,
+    });
+  }
+
+  monthSyncSummary(result) {
+    if (result?.skipped_reason === "no_year_plan") {
+      return `Expense saved, but ${result.month_key} has no generated year plan to sync into.`;
+    }
+    if (result?.created_entries) {
+      return `Added ${result.created_entries} missing expense${result.created_entries === 1 ? "" : "s"} to ${result.month_key}; existing entries and payments were kept.`;
+    }
+    return `No missing scheduled expenses for ${result?.month_key || "this month"}; existing entries and payments were kept.`;
+  }
+
+  async syncCurrentMonth() {
+    if (!this._hass || this._monthSyncBusy) {
+      return;
+    }
+    this._monthSyncBusy = true;
+    this._monthSyncError = "";
+    this._monthSyncMessage = "";
+    this.render();
+    try {
+      const result = await this.syncMonthLedger(this._monthKey);
+      this._monthSyncMessage = this.monthSyncSummary(result);
+      if (!result?.skipped_reason) {
+        await this.loadCurrentMonth();
+      }
+    } catch (err) {
+      this._monthSyncError = err?.message || String(err);
+    } finally {
+      this._monthSyncBusy = false;
       this.render();
     }
   }
@@ -800,6 +866,7 @@ class FinanceTrackerPanel extends HTMLElement {
     this._importBusy = true;
     this._importError = "";
     this._importResult = null;
+    this._importSyncResult = "";
     this.render();
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -813,6 +880,12 @@ class FinanceTrackerPanel extends HTMLElement {
         filename: file.name,
         content: btoa(binary),
       });
+      try {
+        const sync = await this.syncMonthLedger(this._monthKey);
+        this._importSyncResult = this.monthSyncSummary(sync);
+      } catch (err) {
+        this._importSyncResult = `Import completed, but ${this._monthKey} could not be synced: ${err?.message || String(err)}`;
+      }
     } catch (err) {
       this._importError = err?.message || String(err);
     } finally {
@@ -1865,6 +1938,10 @@ class FinanceTrackerPanel extends HTMLElement {
       this.loadCurrentMonth();
     });
 
+    this.shadowRoot.querySelector("[data-sync-month]")?.addEventListener("click", () => {
+      this.syncCurrentMonth();
+    });
+
     this.shadowRoot.querySelectorAll("[data-entry-id]").forEach((button) => {
       button.addEventListener("click", () => {
         const entry = this._data?.entries?.find(
@@ -1891,6 +1968,8 @@ class FinanceTrackerPanel extends HTMLElement {
       this._monthKey = String(data.get("month_key"));
       this._monthStatus = String(data.get("status") || "");
       this._monthCategory = String(data.get("category") || "").trim();
+      this._monthSyncMessage = "";
+      this._monthSyncError = "";
       this.loadCurrentMonth();
     });
 
@@ -1898,6 +1977,8 @@ class FinanceTrackerPanel extends HTMLElement {
       this._monthKey = new Date().toLocaleDateString("en-CA", { year: "numeric", month: "2-digit" });
       this._monthStatus = "";
       this._monthCategory = "";
+      this._monthSyncMessage = "";
+      this._monthSyncError = "";
       this.loadCurrentMonth();
     });
 
@@ -2134,9 +2215,12 @@ class FinanceTrackerPanel extends HTMLElement {
           <div>No month entries yet.</div>
           <div class="form-actions">
             <button class="secondary-button" data-refresh>Refresh</button>
+            <button class="secondary-button" data-sync-month ${this._monthSyncBusy ? "disabled" : ""}>${this._monthSyncBusy ? "Syncing..." : "Sync missing expenses"}</button>
             <button class="primary-button" data-generate-current-month>Generate this month</button>
           </div>
         </div>
+        ${this._monthSyncError ? `<div class="error" role="alert">${this._escape(this._monthSyncError)}</div><br>` : ""}
+        ${this._monthSyncMessage ? `<div class="empty" role="status" aria-live="polite">${this._escape(this._monthSyncMessage)}</div><br>` : ""}
         <div class="empty">
           <div class="getting-started">
             <strong>Getting started</strong>
@@ -2271,9 +2355,12 @@ class FinanceTrackerPanel extends HTMLElement {
         </div>
         <div class="form-actions">
           <button class="secondary-button" data-refresh ${this._loading ? "disabled" : ""}>Refresh</button>
+          <button class="secondary-button" data-sync-month ${this._monthSyncBusy || this._loading ? "disabled" : ""}>${this._monthSyncBusy ? "Syncing..." : "Sync missing expenses"}</button>
           <button class="secondary-button" data-export-current ${this._loading ? "disabled" : ""}>Export CSV</button>
         </div>
       </div>
+      ${this._monthSyncError ? `<div class="error" role="alert">${this._escape(this._monthSyncError)}</div><br>` : ""}
+      ${this._monthSyncMessage ? `<div class="empty" role="status" aria-live="polite">${this._escape(this._monthSyncMessage)}</div><br>` : ""}
       <div class="summary">
         <div class="metric">
           <div class="metric-label">Scheduled</div>
@@ -2370,6 +2457,7 @@ class FinanceTrackerPanel extends HTMLElement {
         </div>
       </div>
       ${this._expenseError ? `<div class="error" role="alert">${this._escape(this._expenseError)}</div><br>` : ""}
+      ${this._expenseNotice ? `<div class="empty" role="status" aria-live="polite">${this._escape(this._expenseNotice)}</div><br>` : ""}
       ${this._expenseBulkResult ? `<div class="empty" role="status" aria-live="polite">${this._escape(this._expenseBulkResult)}</div><br>` : ""}
       ${expenses.length ? `<div class="toolbar report-card">
         <label style="display:flex;align-items:center;gap:8px">
@@ -2460,10 +2548,11 @@ class FinanceTrackerPanel extends HTMLElement {
         <button class="secondary-button" type="button" data-download-sample>Download sample CSV</button>
       </div>
       ${this._importError ? `<div class="error" role="alert">${this._escape(this._importError)}</div><br>` : ""}
+      ${this._importSyncResult ? `<div class="empty" role="status" aria-live="polite">${this._escape(this._importSyncResult)}</div><br>` : ""}
       ${response ? `
         <div class="empty">
           <strong>${this._escape(response.imported_count || 0)} expenses imported from ${this._escape(response.filename || "file")}.</strong>
-          <p>Import creates reusable expense definitions only. Create the yearly ledger next so Current Month can show payable entries.</p>
+          <p>Matching expenses for the selected month are added to an existing plan without replacing its entries or payments. Generate and activate a year plan to create entries for the rest of the year.</p>
           <ol class="next-steps">
             <li>Open Year Setup.</li>
             <li>Click Generate ${this._escape(this._planYear)} to create a draft from the imported expenses.</li>
