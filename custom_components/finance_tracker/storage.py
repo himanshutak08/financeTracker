@@ -228,6 +228,10 @@ class FinanceTrackerStorage:
         """Rebuild one month ledger from an existing year plan."""
         return await self.hass.async_add_executor_job(self._generate_month, month_key)
 
+    async def async_sync_month(self, month_key: str) -> dict[str, Any]:
+        """Add missing scheduled expenses to a month without replacing its ledger."""
+        return await self.hass.async_add_executor_job(self._sync_month, month_key)
+
     async def async_reset_database(self) -> dict[str, Any]:
         """Delete all Finance Tracker user data while keeping the schema."""
         return await self.hass.async_add_executor_job(self._reset_database)
@@ -1308,6 +1312,166 @@ class FinanceTrackerStorage:
             "created_entries": len(plan_items),
             "replaced_entries": len(existing_entry_ids),
             "deleted_payments": deleted_payments,
+            "plan_status": plan_row["status"],
+        }
+
+    def _sync_month(self, month_key: str) -> dict[str, Any]:
+        """Add missing active-template occurrences without touching existing rows."""
+        normalized_month = str(month_key or "").strip()
+        if not _is_month_key(normalized_month):
+            raise HomeAssistantError("month_key must use YYYY-MM format")
+
+        plan_year = int(normalized_month[:4])
+        month_number = int(normalized_month[5:7])
+        now = _utcnow()
+        created_entries = 0
+        created_plan_items = 0
+        restored_entries = 0
+        skipped_existing = 0
+
+        with self._connect() as conn:
+            plan_row = conn.execute(
+                "SELECT year_plan_id, status FROM year_plans WHERE plan_year = ?",
+                (plan_year,),
+            ).fetchone()
+            if plan_row is None:
+                return {
+                    "month_key": normalized_month,
+                    "year": plan_year,
+                    "created_entries": 0,
+                    "created_plan_items": 0,
+                    "restored_entries": 0,
+                    "skipped_existing": 0,
+                    "plan_status": None,
+                    "skipped_reason": "no_year_plan",
+                }
+
+            year_plan_id = plan_row["year_plan_id"]
+            existing_items = {
+                row["template_id"]: row
+                for row in conn.execute(
+                    """
+                    SELECT plan_item_id, template_id, scheduled_amount, due_day, due_date
+                    FROM year_plan_items
+                    WHERE year_plan_id = ? AND month_number = ?
+                    """,
+                    (year_plan_id, month_number),
+                ).fetchall()
+            }
+            existing_entry_plan_ids = {
+                row["plan_item_id"]
+                for row in conn.execute(
+                    "SELECT plan_item_id FROM month_entries WHERE month_key = ?",
+                    (normalized_month,),
+                ).fetchall()
+            }
+            templates = conn.execute(
+                "SELECT * FROM expense_templates WHERE is_active = 1 ORDER BY category, name"
+            ).fetchall()
+            custom_rules = self._load_month_rules(conn)
+
+            for template in templates:
+                template_id = template["template_id"]
+                month_spec = next(
+                    (
+                        spec
+                        for spec in self._expand_template_for_year(
+                            plan_year, template, custom_rules.get(template_id, {})
+                        )
+                        if spec.month_number == month_number
+                    ),
+                    None,
+                )
+                if month_spec is None:
+                    continue
+
+                plan_item = existing_items.get(template_id)
+                if plan_item is None:
+                    plan_item_id = uuid4().hex
+                    conn.execute(
+                        """
+                        INSERT INTO year_plan_items (
+                            plan_item_id, year_plan_id, template_id, month_number,
+                            scheduled_amount, due_day, due_date, status, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+                        """,
+                        (
+                            plan_item_id,
+                            year_plan_id,
+                            template_id,
+                            month_number,
+                            month_spec.amount,
+                            month_spec.due_day,
+                            month_spec.due_date,
+                            now,
+                        ),
+                    )
+                    scheduled_amount = month_spec.amount
+                    due_day = month_spec.due_day
+                    due_date = month_spec.due_date
+                    created_plan_items += 1
+                else:
+                    plan_item_id = plan_item["plan_item_id"]
+                    if plan_item_id in existing_entry_plan_ids:
+                        skipped_existing += 1
+                        continue
+                    scheduled_amount = float(plan_item["scheduled_amount"])
+                    due_day = plan_item["due_day"]
+                    due_date = plan_item["due_date"]
+                    restored_entries += 1
+
+                conn.execute(
+                    """
+                    INSERT INTO month_entries (
+                        entry_id, plan_item_id, template_id, month_key, display_order,
+                        name, category, icon, scheduled_amount, actual_paid_amount,
+                        remaining_amount, due_date, status, notes, paid_date,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, NULL, ?, ?)
+                    """,
+                    (
+                        uuid4().hex,
+                        plan_item_id,
+                        template_id,
+                        normalized_month,
+                        _display_order_for_month_key(normalized_month, due_day),
+                        template["name"],
+                        template["category"],
+                        template["icon"],
+                        scheduled_amount,
+                        scheduled_amount,
+                        due_date,
+                        _status_for_amounts(scheduled_amount, 0.0),
+                        template["notes"],
+                        now,
+                        now,
+                    ),
+                )
+                existing_entry_plan_ids.add(plan_item_id)
+                created_entries += 1
+
+            self._insert_audit_event(
+                conn,
+                "month_entries",
+                normalized_month,
+                "month_synced",
+                {
+                    "month_key": normalized_month,
+                    "year": plan_year,
+                    "created_entries": created_entries,
+                    "created_plan_items": created_plan_items,
+                    "restored_entries": restored_entries,
+                    "skipped_existing": skipped_existing,
+                },
+            )
+
+        return {
+            "month_key": normalized_month,
+            "year": plan_year,
+            "created_entries": created_entries,
+            "created_plan_items": created_plan_items,
+            "restored_entries": restored_entries,
+            "skipped_existing": skipped_existing,
             "plan_status": plan_row["status"],
         }
 
