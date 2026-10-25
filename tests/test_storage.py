@@ -138,6 +138,67 @@ class FinanceTrackerStorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(undone["entry"]["actual_paid_amount"], 40.0)
         self.assertEqual(undone["entry"]["remaining_amount"], 60.0)
 
+    async def test_sync_month_adds_custom_month_expense_without_replacing_payments(self) -> None:
+        await self._add_monthly_expense()
+        await self.storage.async_generate_year(2026)
+        october = await self.storage.async_get_current_month(month_key="2026-10")
+        electricity = october["entries"][0]
+        await self.storage.async_mark_paid(
+            electricity["entry_id"], 100.0, "2026-10-14", "Paid before sync"
+        )
+
+        maintenance = await self.storage.async_add_expense(
+            {
+                "name": "106A maintenance",
+                "category": "Maintenance",
+                "recurrence": "custom_months",
+                "amount": 18165.0,
+                "due_day": 15,
+                "start_month": 1,
+                "end_month": 12,
+                "custom_months": "1,4,7,10",
+            }
+        )
+
+        synced = await self.storage.async_sync_month("2026-10")
+        october_after_sync = await self.storage.async_get_current_month(
+            month_key="2026-10"
+        )
+        electricity_after_sync = next(
+            entry for entry in october_after_sync["entries"] if entry["name"] == "Electricity"
+        )
+        maintenance_after_sync = next(
+            entry
+            for entry in october_after_sync["entries"]
+            if entry["name"] == "106A maintenance"
+        )
+
+        self.assertEqual(synced["created_entries"], 1)
+        self.assertEqual(synced["created_plan_items"], 1)
+        self.assertEqual(maintenance_after_sync["template_id"], maintenance["template_id"])
+        self.assertEqual(maintenance_after_sync["scheduled_amount"], 18165.0)
+        self.assertEqual(maintenance_after_sync["due_date"], "2026-10-15")
+        self.assertEqual(electricity_after_sync["status"], "paid")
+        self.assertEqual(electricity_after_sync["actual_paid_amount"], 100.0)
+
+        repeated_sync = await self.storage.async_sync_month("2026-10")
+        february = await self.storage.async_get_current_month(month_key="2026-02")
+        self.assertEqual(repeated_sync["created_entries"], 0)
+        self.assertEqual(repeated_sync["skipped_existing"], 2)
+        self.assertFalse(
+            any(entry["name"] == "106A maintenance" for entry in february["entries"])
+        )
+
+    async def test_sync_month_without_plan_skips_without_creating_a_ledger(self) -> None:
+        await self._add_monthly_expense()
+
+        result = await self.storage.async_sync_month("2026-10")
+
+        self.assertEqual(result["skipped_reason"], "no_year_plan")
+        self.assertEqual(result["created_entries"], 0)
+        current_month = await self.storage.async_get_current_month(month_key="2026-10")
+        self.assertEqual(current_month["entry_count"], 0)
+
     async def test_copy_year_creates_reviewable_draft_with_same_schedule(self) -> None:
         await self._add_monthly_expense(amount=89.99)
         await self.storage.async_generate_year(2027)
